@@ -1,0 +1,40 @@
+services:
+  eve-web:
+    image: nginx:1.27-alpine
+    container_name: eve-web
+    restart: unless-stopped
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.eve.rule=Host(`eve.${TRAEFIK_DOMAIN}`)"
+      - "traefik.http.routers.eve.entrypoints=websecure"
+      - "traefik.http.routers.eve.tls.certresolver=letsencrypt"
+    networks:
+      - traefik-public
+  eve-api:
+    build:
+      context: ./api
+    container_name: eve-api
+    restart: unless-stopped
+    environment:
+      CACHE_DIR: /data
+      SCAN_CACHE_TTL: 300
+      ESI_SLEEP: 0.08
+    volumes:
+      - ./api/data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.eve-api.rule=Host(`eve.${TRAEFIK_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.eve-api.entrypoints=websecure"
+      - "traefik.http.routers.eve-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.eve-api.priority=100"
+      - "traefik.http.services.eve-api.loadbalancer.server.port=8000"
+    networks:
+      - traefik-public
+
+networks:
+  traefik-public:
+    external: true

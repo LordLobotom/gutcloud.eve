@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AstraRoute</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="aurora" aria-hidden="true"></div>
+    <div class="page">
+      <header class="topbar reveal" style="--delay: 0.05s">
+        <div class="logo">
+          <span class="logo-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="presentation" focusable="false">
+              <circle cx="24" cy="24" r="7" fill="currentColor" />
+              <path
+                d="M8 24c4-9 24-9 32 0"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <path
+                d="M12 14c7-6 17-6 24 0"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                opacity="0.6"
+              />
+              <circle cx="35" cy="18" r="3" fill="currentColor" />
+            </svg>
+          </span>
+          <div>
+            <div class="logo-title">AstraRoute</div>
+            <div class="logo-sub" data-i18n="header.sub">Live market signals for capsuleer traders</div>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="langToggle" class="toggle toggle-lang" data-i18n-aria="controls.langAria" aria-label="Switch language">
+            <span data-lang="en">EN</span>
+            <span class="divider">/</span>
+            <span data-lang="cs">CZ</span>
+          </button>
+          <button id="themeToggle" class="toggle" data-i18n-aria="controls.themeAria" aria-label="Toggle theme">
+            <span class="toggle-icon" aria-hidden="true">◐</span>
+            <span id="themeLabel" data-i18n="controls.themeLight">Light</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-text reveal" style="--delay: 0.15s">
+          <h1 data-i18n="hero.title">Find high-yield trade routes before the market shifts.</h1>
+          <p data-i18n="hero.subtitle">
+            Tune jumps and earnings, scan the latest market gaps, and launch with confidence.
+          </p>
+          <div class="hero-actions">
+            <button class="primary" id="quickScan" data-i18n="hero.quickScan">Quick scan</button>
+            <button class="ghost" id="resetFilters" data-i18n="hero.reset">Reset filters</button>
+          </div>
+        </div>
+        <div class="hero-stats reveal" style="--delay: 0.25s">
+          <div class="stat-card">
+            <div class="stat-label" data-i18n="stats.volume">Tracked volume</div>
+            <div class="stat-value" id="statVolume">8.4B</div>
+            <div class="stat-foot" data-i18n="stats.volumeFoot">ISK in last 30 min</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label" data-i18n="stats.routes">Active routes</div>
+            <div class="stat-value" id="statRoutes">26</div>
+            <div class="stat-foot" data-i18n="stats.routesFoot">Across 5 regions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label" data-i18n="stats.signal">Signal strength</div>
+            <div class="stat-value" id="statSignal">92%</div>
+            <div class="stat-foot" data-i18n="stats.signalFoot">Demand-weighted</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel reveal" style="--delay: 0.35s">
+        <div class="panel-header">
+          <div>
+            <h2 data-i18n="panel.title">Route search</h2>
+            <p data-i18n="panel.subtitle">Choose a hub, set your max jumps, and filter by profit floor.</p>
+          </div>
+          <div class="panel-meta">
+            <span data-i18n="panel.updated">Updated</span>
+            <span id="lastUpdated">--:--</span>
+          </div>
+        </div>
+
+        <div class="panel-grid">
+          <form class="filters" id="filtersForm">
+            <label class="field">
+              <span data-i18n="filters.start">Start location</span>
+              <select id="startLocation"></select>
+            </label>
+            <label class="field">
+              <span data-i18n="filters.jumps">Max jumps</span>
+              <div class="range">
+                <input id="maxJumps" type="range" min="1" max="15" value="6" />
+                <output id="maxJumpsValue">6</output>
+              </div>
+            </label>
+            <label class="field">
+              <span data-i18n="filters.earnings">Minimum earnings (ISK)</span>
+              <input id="minProfit" type="number" min="0" step="1000000" value="15000000" />
+            </label>
+            <label class="field">
+              <span data-i18n="filters.sort">Sort by</span>
+              <select id="sortBy">
+                <option value="score" data-i18n="filters.sortScore">Signal score</option>
+                <option value="profit" data-i18n="filters.sortProfit">Highest earnings</option>
+                <option value="jumps" data-i18n="filters.sortJumps">Fewest jumps</option>
+              </select>
+            </label>
+            <button class="primary" type="button" id="searchButton" data-i18n="filters.search">Search routes</button>
+          </form>
+
+          <div class="results">
+            <div class="results-head">
+              <div>
+                <div class="results-title" data-i18n="results.title">Trade options</div>
+                <div class="results-sub" id="resultsCount">--</div>
+              </div>
+              <div class="results-summary" id="resultsSummary"></div>
+            </div>
+            <div class="results-source" id="resultsSource"></div>
+            <div class="analysis" id="analysisCard">
+              <div class="analysis-title" data-i18n="analysis.title">Signal analysis</div>
+              <p id="analysisText"></p>
+            </div>
+            <div class="results-loading" id="resultsLoading" data-i18n="results.loading">Scanning live markets...</div>
+            <div class="results-list" id="resultsList"></div>
+            <div class="results-empty" id="resultsEmpty" data-i18n="results.empty">No routes match your filters.</div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer reveal" style="--delay: 0.45s">
+        <div data-i18n="footer.note">Data is simulated for demo use. Connect to live market feeds for production.</div>
+      </footer>
+    </div>
+
+    <script defer src="app.js"></script>
+  </body>
+</html>
