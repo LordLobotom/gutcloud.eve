@@ -238,8 +238,8 @@ const translations = {
     badges: {
       demand: (value) => `Demand ${value}%`,
       risk: (value) => `Risk ${value}`,
-      security: (value) => `${value} security`,
-      jumps: (value) => `${value} jumps`,
+      security: (value) => value,
+      jumps: (value) => `${value} ${value === 1 ? "jump" : "jumps"}`,
       instant: "Instant",
       list: "List"
     },
@@ -248,6 +248,10 @@ const translations = {
       volume: "Cargo",
       eta: "ETA",
       score: "Signal",
+      jumps: "Jumps",
+      profitPerJump: "Profit/jump",
+      demand: "Demand",
+      risk: "Risk",
       perJump: "per jump",
       spread: "Spread",
       carry: "Carry"
@@ -324,8 +328,16 @@ const translations = {
     badges: {
       demand: (value) => `Poptávka ${value}%`,
       risk: (value) => `Riziko ${value}`,
-      security: (value) => `${value} bezpečnost`,
-      jumps: (value) => `${value} skoky`,
+      security: (value) => value,
+      jumps: (value) => {
+        if (value === 1) {
+          return `${value} skok`;
+        }
+        if (value < 5) {
+          return `${value} skoky`;
+        }
+        return `${value} skoků`;
+      },
       instant: "Okamžitě",
       list: "Nabídka"
     },
@@ -334,6 +346,10 @@ const translations = {
       volume: "Náklad",
       eta: "ETA",
       score: "Signál",
+      jumps: "Skoky",
+      profitPerJump: "Zisk/skok",
+      demand: "Poptávka",
+      risk: "Riziko",
       perJump: "na skok",
       spread: "Spread",
       carry: "Vézt"
@@ -704,38 +720,67 @@ const renderResults = (filtered) => {
     const primaryCommodity = route.primary || route.commodities[0] || "";
     const riskLabel = route.risk >= 0.3 ? "high" : route.risk >= 0.15 ? "medium" : "low";
     const riskText = translations[activeLocale].riskLevels[riskLabel];
-    const demand = translations[activeLocale].badges.demand(route.demand);
-    const risk = translations[activeLocale].badges.risk(riskText);
-    const security = translations[activeLocale].badges.security(route.security);
-    const jumpsBadge = translations[activeLocale].badges.jumps(route.jumps);
     const modeKey = route.mode === "list" ? "list" : route.mode === "instant" ? "instant" : null;
-    const modeBadge = modeKey ? translations[activeLocale].badges[modeKey] : null;
-    const modeMarkup = modeBadge ? `<span class="badge mode">${modeBadge}</span>` : "";
+    const modeLabel = modeKey ? translations[activeLocale].badges[modeKey] : null;
+    const securityTag = route.security ? `<span class="tag">${route.security}</span>` : "";
+    const modeTag = modeLabel ? `<span class="tag tag-mode">${modeLabel}</span>` : "";
+    const cargoLine = primaryCommodity
+      ? `<div class="route-cargo"><span>${translations[activeLocale].card.carry}</span>${primaryCommodity}</div>`
+      : "";
+    const profitPerJump = formatISK(calc.profitPerJump(route));
+    const demandValue = `${route.demand}%`;
+    const spreadValue = `+${Math.round((route.demand / 100) * 12)}%`;
 
     card.innerHTML = `
-      <div class="route-head">
-        <div>
+      <div class="route-top">
+        <div class="route-path">
           <div class="route-title">${route.from} -> ${route.to}</div>
-          <div class="route-commodity"><span>${translations[activeLocale].card.carry}</span> ${primaryCommodity}</div>
-          <div class="route-profit">${formatISK(route.profit)}</div>
+          ${cargoLine}
+          <div class="route-tags">
+            ${securityTag}
+            ${modeTag}
+          </div>
         </div>
-        <div class="badges">
-          <span class="badge">${jumpsBadge}</span>
-          ${modeMarkup}
-          <span class="badge security">${security}</span>
-          <span class="badge risk">${risk}</span>
-          <span class="badge">${demand}</span>
+        <div class="route-profit-block">
+          <div class="route-profit-label">${translations[activeLocale].card.profit}</div>
+          <div class="route-profit-value">${formatISK(route.profit)}</div>
         </div>
       </div>
-      <div class="route-meta">
-        <div>${translations[activeLocale].card.profit}: ${formatISK(calc.profitPerJump(route))} ${translations[activeLocale].card.perJump}</div>
-        <div>${translations[activeLocale].card.volume}: ${formatNumber(route.volume)} m3</div>
-        <div>${translations[activeLocale].card.eta}: ${calc.eta(route)}</div>
+      <div class="route-metrics">
+        <div class="metric">
+          <div class="metric-label">${translations[activeLocale].card.jumps}</div>
+          <div class="metric-value">${route.jumps}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">${translations[activeLocale].card.profitPerJump}</div>
+          <div class="metric-value">${profitPerJump}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">${translations[activeLocale].card.volume}</div>
+          <div class="metric-value">${formatNumber(route.volume)} m3</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">${translations[activeLocale].card.eta}</div>
+          <div class="metric-value">${calc.eta(route)}</div>
+        </div>
       </div>
-      <div class="route-meta">
-        <div>${translations[activeLocale].card.score}: ${formatScore(calc.score(route))}</div>
-        <div>${route.commodities.join(" / ")}</div>
-        <div>${translations[activeLocale].card.spread} +${Math.round((route.demand / 100) * 12)}%</div>
+      <div class="route-signal">
+        <div class="signal-item">
+          <span>${translations[activeLocale].card.score}</span>
+          <strong>${formatScore(calc.score(route))}</strong>
+        </div>
+        <div class="signal-item">
+          <span>${translations[activeLocale].card.demand}</span>
+          <strong>${demandValue}</strong>
+        </div>
+        <div class="signal-item">
+          <span>${translations[activeLocale].card.risk}</span>
+          <strong>${riskText}</strong>
+        </div>
+        <div class="signal-item">
+          <span>${translations[activeLocale].card.spread}</span>
+          <strong>${spreadValue}</strong>
+        </div>
       </div>
     `;
 
@@ -761,14 +806,9 @@ const init = () => {
 
   elements.maxJumps.addEventListener("input", () => {
     elements.maxJumpsValue.textContent = elements.maxJumps.value;
-    filterRoutes();
   });
 
-  elements.startLocation.addEventListener("change", runLiveScan);
-  elements.minProfit.addEventListener("input", filterRoutes);
-  elements.sortBy.addEventListener("change", filterRoutes);
   elements.searchButton.addEventListener("click", runLiveScan);
-  elements.maxJumps.addEventListener("change", runLiveScan);
 
   elements.quickScan.addEventListener("click", () => {
     elements.startLocation.value = "any";
@@ -776,7 +816,6 @@ const init = () => {
     elements.maxJumpsValue.textContent = "4";
     elements.minProfit.value = "50000000";
     elements.sortBy.value = "score";
-    runLiveScan();
   });
 
   elements.resetFilters.addEventListener("click", () => {
@@ -785,7 +824,6 @@ const init = () => {
     elements.maxJumpsValue.textContent = "6";
     elements.minProfit.value = "15000000";
     elements.sortBy.value = "score";
-    runLiveScan();
   });
 
   elements.themeToggle.addEventListener("click", () => {

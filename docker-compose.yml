@@ -1,10 +1,10 @@
 services:
   eve-web:
-    image: nginx:1.27-alpine
+    build:
+      context: .
+      dockerfile: ./web/Dockerfile
     container_name: eve-web
     restart: unless-stopped
-    volumes:
-      - ./html:/usr/share/nginx/html:ro
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-public"
