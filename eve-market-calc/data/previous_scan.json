@@ -1,0 +1,243 @@
+{
+  "generated_at": "2025-01-03T00:00:00Z",
+  "source": "earlier chat scan outputs (Jita vs hub sell spreads, sample-based)",
+  "top_by_profit": [
+    {
+      "type_id": 33726,
+      "name": "Women's 'Sanctity' Dress (black/gold)",
+      "jita_sell": 1491000000.0,
+      "best_sell": 2260000000.0,
+      "best_hub": "Amarr",
+      "profit": 769000000.0,
+      "pct": 51.57612340710932
+    },
+    {
+      "type_id": 36510,
+      "name": "Men's 'Hephaestus' Shoes (gray/orange)",
+      "jita_sell": 650000000.0,
+      "best_sell": 1200000000.0,
+      "best_hub": "Amarr",
+      "profit": 550000000.0,
+      "pct": 84.61538461538461
+    },
+    {
+      "type_id": 35832,
+      "name": "Astrahus",
+      "jita_sell": 1009000000.0,
+      "best_sell": 1191000000.0,
+      "best_hub": "Hek",
+      "profit": 182000000.0,
+      "pct": 18.037661050545097
+    },
+    {
+      "type_id": 4153,
+      "name": "Women's 'Structure' Dress (red)",
+      "jita_sell": 28570000.0,
+      "best_sell": 199700000.0,
+      "best_hub": "Amarr",
+      "profit": 171130000.0,
+      "pct": 598.9849492474624
+    },
+    {
+      "type_id": 4346,
+      "name": "Gistum A-Type Multispectrum Shield Hardener",
+      "jita_sell": 821000000.0,
+      "best_sell": 973300000.0,
+      "best_hub": "Hek",
+      "profit": 152300000.0,
+      "pct": 18.550548112058465
+    },
+    {
+      "type_id": 44211,
+      "name": "Rejected Ship Replacement Program Request",
+      "jita_sell": 4289000.0,
+      "best_sell": 100000000.0,
+      "best_hub": "Hek",
+      "profit": 95711000.0,
+      "pct": 2231.5458148752623
+    },
+    {
+      "type_id": 34606,
+      "name": "Prophecy Kador SKIN",
+      "jita_sell": 9390000.0,
+      "best_sell": 99980000.0,
+      "best_hub": "Hek",
+      "profit": 90590000.0,
+      "pct": 964.7497337593185
+    },
+    {
+      "type_id": 44125,
+      "name": "Men's YC119 Yoiul Festival Cap",
+      "jita_sell": 3488000.0,
+      "best_sell": 49290000.0,
+      "best_hub": "Rens",
+      "profit": 45802000.0,
+      "pct": 1313.1307339449543
+    },
+    {
+      "type_id": 34424,
+      "name": "Titanium Plated Cranial Shielding",
+      "jita_sell": 4000000.0,
+      "best_sell": 45000000.0,
+      "best_hub": "Hek",
+      "profit": 41000000.0,
+      "pct": 1025.0
+    },
+    {
+      "type_id": 33297,
+      "name": "Capital Drone Speed Augmentor I",
+      "jita_sell": 10420000.0,
+      "best_sell": 29140000.0,
+      "best_hub": "Amarr",
+      "profit": 18720000.0,
+      "pct": 179.65451055662186
+    },
+    {
+      "type_id": 3469,
+      "name": "'Basic' Co-Processor",
+      "jita_sell": 1225000.0,
+      "best_sell": 19500000.0,
+      "best_hub": "Rens",
+      "profit": 18275000.0,
+      "pct": 1491.8367346938776
+    },
+    {
+      "type_id": 11451,
+      "name": "Nuclear Physics",
+      "jita_sell": 641400.0,
+      "best_sell": 13920000.0,
+      "best_hub": "Hek",
+      "profit": 13278600.0,
+      "pct": 2070.2525724976613
+    }
+  ],
+  "top_by_pct": [
+    {
+      "type_id": 55353,
+      "name": "Deacon Biosecurity Responders SKIN",
+      "jita_sell": 34890.0,
+      "best_sell": 5000000.0,
+      "best_hub": "Hek",
+      "profit": 4965110.0,
+      "pct": 14230.753797649757
+    },
+    {
+      "type_id": 3357,
+      "name": "Diplomacy",
+      "jita_sell": 5801.0,
+      "best_sell": 390000.0,
+      "best_hub": "Amarr",
+      "profit": 384199.0,
+      "pct": 6622.978796759179
+    },
+    {
+      "type_id": 44211,
+      "name": "Rejected Ship Replacement Program Request",
+      "jita_sell": 4289000.0,
+      "best_sell": 100000000.0,
+      "best_hub": "Hek",
+      "profit": 95711000.0,
+      "pct": 2231.5458148752623
+    },
+    {
+      "type_id": 11451,
+      "name": "Nuclear Physics",
+      "jita_sell": 641400.0,
+      "best_sell": 13920000.0,
+      "best_hub": "Hek",
+      "profit": 13278600.0,
+      "pct": 2070.2525724976613
+    },
+    {
+      "type_id": 253,
+      "name": "Gamma M",
+      "jita_sell": 11940.0,
+      "best_sell": 199000.0,
+      "best_hub": "Hek",
+      "profit": 187060.0,
+      "pct": 1566.6666666666665
+    },
+    {
+      "type_id": 3469,
+      "name": "'Basic' Co-Processor",
+      "jita_sell": 1225000.0,
+      "best_sell": 19500000.0,
+      "best_hub": "Rens",
+      "profit": 18275000.0,
+      "pct": 1491.8367346938776
+    },
+    {
+      "type_id": 44125,
+      "name": "Men's YC119 Yoiul Festival Cap",
+      "jita_sell": 3488000.0,
+      "best_sell": 49290000.0,
+      "best_hub": "Rens",
+      "profit": 45802000.0,
+      "pct": 1313.1307339449543
+    },
+    {
+      "type_id": 61201,
+      "name": "Common Moon Mining Crystal Type B I",
+      "jita_sell": 399800.0,
+      "best_sell": 4989000.0,
+      "best_hub": "Amarr",
+      "profit": 4589200.0,
+      "pct": 1147.8739369684843
+    },
+    {
+      "type_id": 34424,
+      "name": "Titanium Plated Cranial Shielding",
+      "jita_sell": 4000000.0,
+      "best_sell": 45000000.0,
+      "best_hub": "Hek",
+      "profit": 41000000.0,
+      "pct": 1025.0
+    },
+    {
+      "type_id": 34606,
+      "name": "Prophecy Kador SKIN",
+      "jita_sell": 9390000.0,
+      "best_sell": 99980000.0,
+      "best_hub": "Hek",
+      "profit": 90590000.0,
+      "pct": 964.7497337593185
+    },
+    {
+      "type_id": 4153,
+      "name": "Women's 'Structure' Dress (red)",
+      "jita_sell": 28570000.0,
+      "best_sell": 199700000.0,
+      "best_hub": "Amarr",
+      "profit": 171130000.0,
+      "pct": 598.9849492474624
+    },
+    {
+      "type_id": 1129,
+      "name": "Multispectrum Shield Hardener I Blueprint",
+      "jita_sell": 1249000.0,
+      "best_sell": 7500000.0,
+      "best_hub": "Amarr",
+      "profit": 6251000.0,
+      "pct": 500.480384307446
+    }
+  ],
+  "history_7d": [
+    {"type_id": 33726, "name": "Women's 'Sanctity' Dress (black/gold)", "avg_daily_vol_7d": 1.1428571428571428, "last_day_vol": 1},
+    {"type_id": 36510, "name": "Men's 'Hephaestus' Shoes (gray/orange)", "avg_daily_vol_7d": 1.7142857142857142, "last_day_vol": 1},
+    {"type_id": 35832, "name": "Astrahus", "avg_daily_vol_7d": 11.857142857142858, "last_day_vol": 12},
+    {"type_id": 4153, "name": "Women's 'Structure' Dress (red)", "avg_daily_vol_7d": 1.4285714285714286, "last_day_vol": 2},
+    {"type_id": 4346, "name": "Gistum A-Type Multispectrum Shield Hardener", "avg_daily_vol_7d": 8.428571428571429, "last_day_vol": 4},
+    {"type_id": 44211, "name": "Rejected Ship Replacement Program Request", "avg_daily_vol_7d": 1.4285714285714286, "last_day_vol": 3},
+    {"type_id": 34606, "name": "Prophecy Kador SKIN", "avg_daily_vol_7d": 1.1428571428571428, "last_day_vol": 2},
+    {"type_id": 44125, "name": "Men's YC119 Yoiul Festival Cap", "avg_daily_vol_7d": 2.857142857142857, "last_day_vol": 1},
+    {"type_id": 34424, "name": "Titanium Plated Cranial Shielding", "avg_daily_vol_7d": 1.5714285714285714, "last_day_vol": 1},
+    {"type_id": 33297, "name": "Capital Drone Speed Augmentor I", "avg_daily_vol_7d": 2.0, "last_day_vol": 1},
+    {"type_id": 3469, "name": "'Basic' Co-Processor", "avg_daily_vol_7d": 2.857142857142857, "last_day_vol": 5},
+    {"type_id": 11451, "name": "Nuclear Physics", "avg_daily_vol_7d": 62.0, "last_day_vol": 40},
+    {"type_id": 55353, "name": "Deacon Biosecurity Responders SKIN", "avg_daily_vol_7d": 5.571428571428571, "last_day_vol": 4},
+    {"type_id": 3357, "name": "Diplomacy", "avg_daily_vol_7d": 22.571428571428573, "last_day_vol": 17},
+    {"type_id": 253, "name": "Gamma M", "avg_daily_vol_7d": 415.0, "last_day_vol": 213},
+    {"type_id": 61201, "name": "Common Moon Mining Crystal Type B I", "avg_daily_vol_7d": 72.71428571428571, "last_day_vol": 90},
+    {"type_id": 1129, "name": "Multispectrum Shield Hardener I Blueprint", "avg_daily_vol_7d": 17.142857142857142, "last_day_vol": 7}
+  ]
+}

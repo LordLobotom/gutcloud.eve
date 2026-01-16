@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+
+# Local caches and outputs
+data/esi_cache.json
+data/types_region.json
+data/nearby_systems.json
+data/scan_*.json
+data/scan_*.csv
+
+# Legacy cache name
+# (may exist from earlier runs)
+data/types_the_forge.json
