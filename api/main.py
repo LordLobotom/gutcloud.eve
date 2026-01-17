@@ -2,9 +2,11 @@ import json
 import os
 import random
 import time
+import traceback
 from collections import deque
 from datetime import datetime, timezone
 from urllib.parse import urlencode
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, HTTPException, Query
@@ -75,6 +77,22 @@ class EsiClient:
                     resp_headers = dict(resp.headers)
                 time.sleep(self.sleep_seconds)
                 return payload, resp_headers
+            except HTTPError as exc:
+                print(f"ESI HTTP error {exc.code} for {url}", flush=True)
+                try:
+                    detail = exc.read(200).decode("utf-8", errors="ignore")
+                except Exception:
+                    detail = ""
+                if detail:
+                    print(f"ESI error body: {detail}", flush=True)
+                if attempt >= self.retries:
+                    raise
+                time.sleep(self.sleep_seconds * (attempt + 1))
+            except URLError as exc:
+                print(f"ESI URL error for {url}: {exc}", flush=True)
+                if attempt >= self.retries:
+                    raise
+                time.sleep(self.sleep_seconds * (attempt + 1))
             except Exception:
                 if attempt >= self.retries:
                     raise
@@ -124,13 +142,10 @@ class EsiClient:
     def resolve_system_id(self, name):
         if not name:
             return None
-        payload, _ = self.get_json(
-            "/search/",
-            {"categories": "system", "search": name, "strict": "true"},
-        )
+        payload, _ = self.post_json("/universe/ids/", [name])
         systems = payload.get("systems") if isinstance(payload, dict) else None
         if systems:
-            return systems[0]
+            return systems[0].get("id")
         return None
 
 
@@ -142,11 +157,15 @@ client = EsiClient(
 )
 
 
-def build_nearby_systems(client_ref, start_system_id, max_jumps, min_security):
+def build_nearby_systems(client_ref, start_system_id, max_jumps, min_security, deadline=None):
     visited = {start_system_id: 0}
     queue = deque([start_system_id])
+    timed_out = False
 
     while queue:
+        if deadline and time.monotonic() > deadline:
+            timed_out = True
+            break
         system_id = queue.popleft()
         depth = visited[system_id]
         if depth >= max_jumps:
@@ -181,7 +200,7 @@ def build_nearby_systems(client_ref, start_system_id, max_jumps, min_security):
         if reg_id is not None:
             region_to_systems.setdefault(reg_id, set()).add(system_id)
 
-    return systems, region_to_systems
+    return systems, region_to_systems, timed_out
 
 
 def load_nearby_cache(path, start_system_id, max_jumps, min_security):
@@ -332,7 +351,10 @@ def scan_market(
     refresh_cache,
     refresh_nearby,
     refresh_types,
+    max_runtime,
 ):
+    start_ts = time.monotonic()
+    deadline = start_ts + max_runtime if max_runtime else None
     if refresh_cache and os.path.exists(client.cache_path):
         os.remove(client.cache_path)
         client.cache = client._load_cache()
@@ -367,12 +389,14 @@ def scan_market(
         )
     if cached_nearby:
         systems, region_to_systems = cached_nearby
+        nearby_timed_out = False
     else:
-        systems, region_to_systems = build_nearby_systems(
+        systems, region_to_systems, nearby_timed_out = build_nearby_systems(
             client,
             start_system_id,
             max_jumps,
             min_security,
+            deadline=deadline,
         )
         save_nearby_cache(
             nearby_cache_path,
@@ -413,7 +437,11 @@ def scan_market(
     instant_results = []
     list_results = []
 
+    timed_out = nearby_timed_out
     for type_id in sample_types:
+        if deadline and time.monotonic() > deadline:
+            timed_out = True
+            break
         home_sell, home_sell_vol = find_best_home_sell(
             client,
             start_region_id,
@@ -514,6 +542,8 @@ def scan_market(
         "min_security": min_security,
         "min_margin_pct": min_margin_pct,
         "sample_size": len(sample_types),
+        "partial": timed_out,
+        "runtime_ms": int((time.monotonic() - start_ts) * 1000),
         "results": {
             "instant": instant_results,
             "list": list_results,
@@ -528,17 +558,18 @@ def scan(
     max_jumps: int = Query(10, ge=1, le=30),
     min_security: float = Query(0.5, ge=0.0, le=1.0),
     min_margin_pct: float = Query(8.0, ge=0.0, le=500.0),
-    sample_size: int = Query(160, ge=0, le=1000),
-    types_pages: int = Query(0, ge=0, le=20),
-    order_pages: int = Query(3, ge=0, le=50),
+    sample_size: int = Query(60, ge=0, le=1000),
+    types_pages: int = Query(2, ge=0, le=20),
+    order_pages: int = Query(1, ge=0, le=50),
     max_price: float = Query(0.0, ge=0.0),
     mode: str = Query("both"),
     tax_pct: float = Query(2.0, ge=0.0, le=20.0),
     broker_pct: float = Query(3.0, ge=0.0, le=20.0),
-    limit: int = Query(40, ge=0, le=200),
+    limit: int = Query(20, ge=0, le=200),
     refresh_cache: bool = Query(False),
     refresh_nearby: bool = Query(False),
     refresh_types: bool = Query(False),
+    max_runtime: int = Query(12, ge=1, le=120),
 ):
     mode = mode.lower().strip()
     if mode not in ("instant", "list", "both"):
@@ -558,6 +589,7 @@ def scan(
         "tax_pct": tax_pct,
         "broker_pct": broker_pct,
         "limit": limit,
+        "max_runtime": max_runtime,
     }, sort_keys=True)
 
     now = time.time()
@@ -585,11 +617,14 @@ def scan(
             refresh_cache,
             refresh_nearby,
             refresh_types,
+            max_runtime,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail="ESI scan failed") from exc
+        print("ESI scan failed:", exc, flush=True)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     data["cached"] = False
     scan_cache[cache_key] = {"ts": now, "data": data}

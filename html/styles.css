@@ -407,9 +407,13 @@ h3,
 
 .route-cargo {
   margin-top: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--muted);
+  min-width: 0;
 }
 
 .route-cargo span {
@@ -417,7 +421,14 @@ h3,
   font-size: 0.62rem;
   letter-spacing: 0.18em;
   color: var(--accent);
-  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.cargo-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .route-tags {

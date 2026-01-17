@@ -219,7 +219,10 @@ const translations = {
       sourceLive: "Live ESI feed",
       sourceCached: "Cached ESI feed",
       sourceDemo: "Demo data",
-      sourceError: "Live feed unavailable"
+      sourceError: "Live feed unavailable",
+      sourceIdle: "Ready to scan",
+      emptyStart: "Press Search routes to start scanning.",
+      emptyError: "Live feed unavailable. Try again."
     },
     analysis: {
       title: "Signal analysis",
@@ -309,7 +312,10 @@ const translations = {
       sourceLive: "Live ESI feed",
       sourceCached: "Cache ESI feed",
       sourceDemo: "Demo data",
-      sourceError: "Live feed nedostupný"
+      sourceError: "Live feed nedostupný",
+      sourceIdle: "Připraveno ke skenu",
+      emptyStart: "Stiskni Hledat trasy pro skenování.",
+      emptyError: "Live feed nedostupný. Zkus to znovu."
     },
     analysis: {
       title: "Analýza signálu",
@@ -391,19 +397,22 @@ const elements = {
 };
 
 const START_LOCATIONS = ["Jita", "Perimeter", "Amarr", "Dodixie", "Rens", "Hek"];
+const DEFAULT_MIN_PROFIT = 1000000;
 const LIVE_DEFAULTS = {
   budget: 10000000,
   minSecurity: 0.5,
   minMargin: 8,
-  sampleSize: 160,
-  orderPages: 3,
+  sampleSize: 60,
+  typesPages: 2,
+  orderPages: 1,
   mode: "both",
-  limit: 40
+  limit: 20,
+  maxRuntime: 12
 };
 
 let activeLocale = "en";
-let activeRoutes = [...demoRoutes];
-let activeSource = "demo";
+let activeRoutes = [];
+let activeSource = "idle";
 let isLoading = false;
 
 const formatters = {
@@ -436,6 +445,17 @@ const getTranslation = (key) => {
   return current;
 };
 
+const parseNumberInput = (value) => {
+  const digits = String(value || "").replace(/[^\d]/g, "");
+  return digits ? parseInt(digits, 10) : 0;
+};
+
+const setMinProfitFormatted = (value) => {
+  elements.minProfit.value = value ? String(value) : "";
+};
+
+const getMinProfitValue = () => parseNumberInput(elements.minProfit.value);
+
 const setLocale = (locale) => {
   activeLocale = locale;
   document.documentElement.lang = locale;
@@ -444,6 +464,8 @@ const setLocale = (locale) => {
   updateLanguageToggle();
   const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
   setTheme(currentTheme);
+  const minProfit = getMinProfitValue() || DEFAULT_MIN_PROFIT;
+  setMinProfitFormatted(minProfit);
   refresh();
 };
 
@@ -522,6 +544,19 @@ const formatScore = (value) => {
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+const escapeHtml = (value) => {
+  return String(value).replace(/[&<>"']/g, (char) => {
+    const map = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "\"": "&quot;",
+      "'": "&#39;"
+    };
+    return map[char] || char;
+  });
+};
+
 const updateSearchButton = () => {
   const key = isLoading ? "filters.searching" : "filters.search";
   const label = getTranslation(key);
@@ -535,7 +570,8 @@ const updateResultsSource = () => {
     live: "results.sourceLive",
     cached: "results.sourceCached",
     demo: "results.sourceDemo",
-    error: "results.sourceError"
+    error: "results.sourceError",
+    idle: "results.sourceIdle"
   };
   const key = keyMap[activeSource] || keyMap.demo;
   const label = getTranslation(key);
@@ -547,6 +583,16 @@ const setLoadingState = (loading) => {
   elements.resultsLoading.style.display = loading ? "block" : "none";
   elements.searchButton.disabled = loading;
   updateSearchButton();
+};
+
+const getEmptyMessageKey = () => {
+  if (activeSource === "idle") {
+    return "results.emptyStart";
+  }
+  if (activeSource === "error") {
+    return "results.emptyError";
+  }
+  return "results.empty";
 };
 
 const getStartSystem = () => {
@@ -605,16 +651,22 @@ const fetchLiveRoutes = async () => {
     min_security: String(LIVE_DEFAULTS.minSecurity),
     min_margin_pct: String(LIVE_DEFAULTS.minMargin),
     sample_size: String(LIVE_DEFAULTS.sampleSize),
+    types_pages: String(LIVE_DEFAULTS.typesPages),
     order_pages: String(LIVE_DEFAULTS.orderPages),
     mode: LIVE_DEFAULTS.mode,
-    limit: String(LIVE_DEFAULTS.limit)
+    limit: String(LIVE_DEFAULTS.limit),
+    max_runtime: String(LIVE_DEFAULTS.maxRuntime)
   });
 
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), (LIVE_DEFAULTS.maxRuntime + 6) * 1000);
   const response = await fetch(`/api/scan?${params.toString()}`, {
     headers: {
       Accept: "application/json"
-    }
+    },
+    signal: controller.signal
   });
+  window.clearTimeout(timeoutId);
 
   if (!response.ok) {
     throw new Error("Scan failed");
@@ -631,7 +683,7 @@ const runLiveScan = async () => {
     activeRoutes = mapped;
     activeSource = payload.cached ? "cached" : "live";
   } catch (error) {
-    activeRoutes = [...demoRoutes];
+    activeRoutes = [];
     activeSource = "error";
   } finally {
     updateResultsSource();
@@ -665,7 +717,7 @@ const updateTimestamp = () => {
 const filterRoutes = () => {
   const start = elements.startLocation.value;
   const maxJumps = parseInt(elements.maxJumps.value, 10);
-  const minProfit = parseInt(elements.minProfit.value || "0", 10);
+  const minProfit = getMinProfitValue();
 
   let filtered = activeRoutes.filter((route) => {
     const matchesStart = start === "any" || route.from === start;
@@ -690,14 +742,18 @@ const renderResults = (filtered) => {
   elements.resultsEmpty.style.display = filtered.length ? "none" : "block";
   updateStats(filtered);
 
-  const countText = translations[activeLocale].results.count(filtered.length);
-  elements.resultsCount.textContent = countText;
-
   if (!filtered.length) {
+    const emptyKey = getEmptyMessageKey();
+    const emptyText = getTranslation(emptyKey) || translations[activeLocale].results.empty;
+    elements.resultsEmpty.textContent = emptyText;
+    elements.resultsCount.textContent = activeSource === "idle" ? "" : translations[activeLocale].results.count(0);
     elements.resultsSummary.textContent = "";
     elements.analysisText.textContent = "";
     return;
   }
+
+  const countText = translations[activeLocale].results.count(filtered.length);
+  elements.resultsCount.textContent = countText;
 
   const avgProfit = filtered.reduce((sum, route) => sum + route.profit, 0) / filtered.length;
   const avgJumps = filtered.reduce((sum, route) => sum + route.jumps, 0) / filtered.length;
@@ -718,14 +774,19 @@ const renderResults = (filtered) => {
     card.className = "route-card";
 
     const primaryCommodity = route.primary || route.commodities[0] || "";
+    const fromName = escapeHtml(route.from);
+    const toName = escapeHtml(route.to);
+    const cargoName = escapeHtml(primaryCommodity);
     const riskLabel = route.risk >= 0.3 ? "high" : route.risk >= 0.15 ? "medium" : "low";
     const riskText = translations[activeLocale].riskLevels[riskLabel];
     const modeKey = route.mode === "list" ? "list" : route.mode === "instant" ? "instant" : null;
     const modeLabel = modeKey ? translations[activeLocale].badges[modeKey] : null;
-    const securityTag = route.security ? `<span class="tag">${route.security}</span>` : "";
-    const modeTag = modeLabel ? `<span class="tag tag-mode">${modeLabel}</span>` : "";
+    const securityTag = route.security
+      ? `<span class="tag">${escapeHtml(route.security)}</span>`
+      : "";
+    const modeTag = modeLabel ? `<span class="tag tag-mode">${escapeHtml(modeLabel)}</span>` : "";
     const cargoLine = primaryCommodity
-      ? `<div class="route-cargo"><span>${translations[activeLocale].card.carry}</span>${primaryCommodity}</div>`
+      ? `<div class="route-cargo"><span>${translations[activeLocale].card.carry}</span><strong class="cargo-name" title="${cargoName}">${cargoName}</strong></div>`
       : "";
     const profitPerJump = formatISK(calc.profitPerJump(route));
     const demandValue = `${route.demand}%`;
@@ -734,7 +795,7 @@ const renderResults = (filtered) => {
     card.innerHTML = `
       <div class="route-top">
         <div class="route-path">
-          <div class="route-title">${route.from} -> ${route.to}</div>
+          <div class="route-title">${fromName} -> ${toName}</div>
           ${cargoLine}
           <div class="route-tags">
             ${securityTag}
@@ -794,6 +855,9 @@ const refresh = () => {
 };
 
 const init = () => {
+  if (!elements.minProfit.value) {
+    elements.minProfit.value = String(DEFAULT_MIN_PROFIT);
+  }
   const storedLocale = localStorage.getItem("locale");
   const browserLocale = navigator.language.startsWith("cs") ? "cs" : "en";
   setLocale(storedLocale || browserLocale);
@@ -814,7 +878,7 @@ const init = () => {
     elements.startLocation.value = "any";
     elements.maxJumps.value = "4";
     elements.maxJumpsValue.textContent = "4";
-    elements.minProfit.value = "50000000";
+    setMinProfitFormatted(50000000);
     elements.sortBy.value = "score";
   });
 
@@ -822,7 +886,7 @@ const init = () => {
     elements.startLocation.value = "any";
     elements.maxJumps.value = "6";
     elements.maxJumpsValue.textContent = "6";
-    elements.minProfit.value = "15000000";
+    setMinProfitFormatted(DEFAULT_MIN_PROFIT);
     elements.sortBy.value = "score";
   });
 
