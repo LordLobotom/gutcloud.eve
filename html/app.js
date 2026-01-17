@@ -398,15 +398,8 @@ const elements = {
 
 const START_LOCATIONS = ["Jita", "Perimeter", "Amarr", "Dodixie", "Rens", "Hek"];
 const DEFAULT_MIN_PROFIT = 1000000;
+const MAX_JUMPS = 8;
 const LIVE_DEFAULTS = {
-  budget: 10000000,
-  minSecurity: 0.5,
-  minMargin: 8,
-  sampleSize: 60,
-  typesPages: 2,
-  orderPages: 1,
-  mode: "both",
-  limit: 20,
   maxRuntime: 12
 };
 
@@ -645,17 +638,7 @@ const mapLiveResults = (payload) => {
 
 const fetchLiveRoutes = async () => {
   const params = new URLSearchParams({
-    start_system: getStartSystem(),
-    budget: String(LIVE_DEFAULTS.budget),
-    max_jumps: String(elements.maxJumps.value),
-    min_security: String(LIVE_DEFAULTS.minSecurity),
-    min_margin_pct: String(LIVE_DEFAULTS.minMargin),
-    sample_size: String(LIVE_DEFAULTS.sampleSize),
-    types_pages: String(LIVE_DEFAULTS.typesPages),
-    order_pages: String(LIVE_DEFAULTS.orderPages),
-    mode: LIVE_DEFAULTS.mode,
-    limit: String(LIVE_DEFAULTS.limit),
-    max_runtime: String(LIVE_DEFAULTS.maxRuntime)
+    start_system: getStartSystem()
   });
 
   const controller = new AbortController();
@@ -869,7 +852,12 @@ const init = () => {
   elements.maxJumpsValue.textContent = elements.maxJumps.value;
 
   elements.maxJumps.addEventListener("input", () => {
-    elements.maxJumpsValue.textContent = elements.maxJumps.value;
+    let value = parseInt(elements.maxJumps.value, 10) || 1;
+    if (value > MAX_JUMPS) {
+      value = MAX_JUMPS;
+      elements.maxJumps.value = String(value);
+    }
+    elements.maxJumpsValue.textContent = String(value);
   });
 
   elements.searchButton.addEventListener("click", runLiveScan);
