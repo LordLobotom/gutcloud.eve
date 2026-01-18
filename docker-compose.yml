@@ -63,6 +63,7 @@ services:
       PREWARM_MAX_RUNTIME: 45
       PREWARM_BUDGET: 50000000
       PREWARM_RETRY_EMPTY: "1"
+      PREWARM_TUNE: "0"
     volumes:
       - ./api/data:/data
     networks:

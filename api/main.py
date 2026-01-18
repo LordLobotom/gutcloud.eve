@@ -464,6 +464,29 @@ def find_best_order_in_systems(client_ref, region_to_systems, order_type, type_i
     return best_price, best_order
 
 
+def find_best_sell_target(client_ref, region_to_systems, type_id, max_pages=0):
+    best_by_system = {}
+    for region_id, system_ids in region_to_systems.items():
+        for order in iter_region_orders(client_ref, region_id, "sell", type_id, max_pages=max_pages):
+            sys_id = order.get("system_id")
+            if sys_id not in system_ids:
+                continue
+            price = order.get("price")
+            if price is None:
+                continue
+            current = best_by_system.get(sys_id)
+            if current is None or price < current["price"]:
+                best_by_system[sys_id] = {"price": price, "order": order}
+
+    best_price = None
+    best_order = None
+    for entry in best_by_system.values():
+        if best_price is None or entry["price"] > best_price:
+            best_price = entry["price"]
+            best_order = entry["order"]
+    return best_price, best_order
+
+
 def calc_profit(buy_price, target_price, tax_pct, broker_pct):
     fee_pct = tax_pct + broker_pct
     net_sell = target_price * (1.0 - fee_pct / 100.0)
@@ -606,6 +629,9 @@ def scan_market(
                 pct = (net_profit / home_sell) * 100.0 if home_sell else 0.0
                 if pct >= min_margin_pct:
                     sys_id = best_order.get("system_id")
+                    sys_id = int(sys_id) if sys_id is not None else None
+                    if sys_id == start_system_id:
+                        continue
                     sys_info = systems.get(sys_id, {})
                     max_units_budget = int(budget // home_sell)
                     max_units = max_units_budget
@@ -629,19 +655,20 @@ def scan_market(
                     })
 
         if mode in ("list", "both"):
-            best_sell, best_order = find_best_order_in_systems(
+            best_sell, best_order = find_best_sell_target(
                 client,
                 region_to_systems,
-                "sell",
                 type_id,
                 max_pages=order_pages,
-                want_highest=False,
             )
             if best_sell and best_sell > home_sell:
                 net_profit = calc_profit(home_sell, best_sell, tax_pct, broker_pct)
                 pct = (net_profit / home_sell) * 100.0 if home_sell else 0.0
                 if pct >= min_margin_pct:
                     sys_id = best_order.get("system_id")
+                    sys_id = int(sys_id) if sys_id is not None else None
+                    if sys_id == start_system_id:
+                        continue
                     sys_info = systems.get(sys_id, {})
                     max_units_budget = int(budget // home_sell)
                     list_results.append({

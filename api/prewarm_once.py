@@ -117,6 +117,8 @@ def run():
         force = os.getenv("PREWARM_FORCE", "0").lower() in ("1", "true", "yes")
         retry_empty = os.getenv("PREWARM_RETRY_EMPTY", "0").lower() in ("1", "true", "yes")
 
+        tune_enabled = os.getenv("PREWARM_TUNE", "1").lower() in ("1", "true", "yes")
+
         failures = 0
         successes = 0
         skipped = 0
@@ -146,12 +148,19 @@ def run():
                     continue
 
             try:
-                max_jumps, sample_size, types_pages, order_pages, tuned = tune_scan_params(
-                    max_jumps_default,
-                    sample_size_default,
-                    types_pages_default,
-                    order_pages_default,
-                )
+                if tune_enabled:
+                    max_jumps, sample_size, types_pages, order_pages, tuned = tune_scan_params(
+                        max_jumps_default,
+                        sample_size_default,
+                        types_pages_default,
+                        order_pages_default,
+                    )
+                else:
+                    max_jumps = max_jumps_default
+                    sample_size = sample_size_default
+                    types_pages = types_pages_default
+                    order_pages = order_pages_default
+                    tuned = False
                 data = scan_market(
                     system,
                     budget,
@@ -213,6 +222,7 @@ def run():
             "skipped_fresh": skipped,
             "cache_ttl_sec": CACHE_TTL,
             "total_opportunities": total_opportunities,
+            "tuned": tune_enabled,
             "errors": errors,
         }
         write_status(status_path, status_payload)
@@ -227,6 +237,7 @@ def run():
             raise SystemExit(1)
     except Exception as exc:
         finished_at = time.time()
+        tuned_value = tune_enabled if "tune_enabled" in locals() else None
         status_payload = {
             "started_at": ts_to_utc(started_at),
             "finished_at": ts_to_utc(finished_at),
@@ -238,6 +249,7 @@ def run():
             "skipped_fresh": 0,
             "cache_ttl_sec": CACHE_TTL,
             "total_opportunities": total_opportunities,
+            "tuned": tuned_value,
             "errors": {"__run__": str(exc)},
         }
         write_status(status_path, status_payload)
