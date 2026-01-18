@@ -174,6 +174,9 @@ const translations = {
     header: {
       sub: "Live market signals for capsuleer traders"
     },
+    nav: {
+      monitor: "Cron monitor"
+    },
     controls: {
       langAria: "Switch language",
       themeAria: "Toggle light/dark",
@@ -266,6 +269,9 @@ const translations = {
   cs: {
     header: {
       sub: "Živé tržní signály pro obchodníky v New Eden"
+    },
+    nav: {
+      monitor: "Monitor aktualizace"
     },
     controls: {
       langAria: "Přepnout jazyk",

@@ -22,15 +22,7 @@ services:
       CACHE_DIR: /data
       SCAN_CACHE_TTL: 1800
       ESI_SLEEP: 0.08
-      PREWARM_ENABLED: "1"
-      PREWARM_INTERVAL_SEC: 1800
-      PREWARM_START_SYSTEMS: "Jita,Amarr,Dodixie,Rens,Hek"
-      PREWARM_MAX_JUMPS: 5
-      PREWARM_SAMPLE_SIZE: 40
-      PREWARM_TYPES_PAGES: 1
-      PREWARM_ORDER_PAGES: 1
-      PREWARM_LIMIT: 10
-      PREWARM_MAX_RUNTIME: 12
+      PREWARM_STATUS_SYSTEMS: "Jita,Amarr,Dodixie,Rens,Hek"
     volumes:
       - ./api/data:/data
     labels:
@@ -41,6 +33,31 @@ services:
       - "traefik.http.routers.eve-api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.eve-api.priority=100"
       - "traefik.http.services.eve-api.loadbalancer.server.port=8000"
+    networks:
+      - traefik-public
+  eve-prewarm:
+    build:
+      context: ./api
+      dockerfile: ./Dockerfile.prewarm
+    container_name: eve-prewarm
+    restart: unless-stopped
+    environment:
+      CACHE_DIR: /data
+      SCAN_CACHE_TTL: 1800
+      ESI_SLEEP: 0.08
+      PREWARM_CRON: "*/30 * * * *"
+      PREWARM_RUN_ON_START: "1"
+      PREWARM_OUTPUT_DIR: /data/prewarm
+      PREWARM_STATUS_FILE: /data/prewarm/last_run.json
+      PREWARM_START_SYSTEMS: "Jita,Amarr,Dodixie,Rens,Hek"
+      PREWARM_MAX_JUMPS: 5
+      PREWARM_SAMPLE_SIZE: 40
+      PREWARM_TYPES_PAGES: 1
+      PREWARM_ORDER_PAGES: 1
+      PREWARM_LIMIT: 10
+      PREWARM_MAX_RUNTIME: 12
+    volumes:
+      - ./api/data:/data
     networks:
       - traefik-public
 

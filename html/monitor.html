@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AstraRoute | Monitor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="aurora" aria-hidden="true"></div>
+    <div class="page">
+      <header class="topbar reveal" style="--delay: 0.05s">
+        <div class="logo">
+          <span class="logo-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="presentation" focusable="false">
+              <circle cx="24" cy="24" r="7" fill="currentColor" />
+              <path
+                d="M8 24c4-9 24-9 32 0"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <path
+                d="M12 14c7-6 17-6 24 0"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                opacity="0.6"
+              />
+              <circle cx="35" cy="18" r="3" fill="currentColor" />
+            </svg>
+          </span>
+          <div>
+            <div class="logo-title">AstraRoute</div>
+            <div class="logo-sub" data-i18n="header.sub">Live market signals for capsuleer traders</div>
+          </div>
+        </div>
+        <nav class="topbar-links">
+          <a class="topbar-link" href="index.html" data-i18n="nav.home">Route scan</a>
+          <a class="topbar-link active" href="monitor.html" data-i18n="nav.monitor">Cron monitor</a>
+        </nav>
+        <div class="controls">
+          <button id="langToggle" class="toggle toggle-lang" data-i18n-aria="controls.langAria" aria-label="Switch language">
+            <span data-lang="en">EN</span>
+            <span class="divider">/</span>
+            <span data-lang="cs">CZ</span>
+          </button>
+          <button id="themeToggle" class="toggle" data-i18n-aria="controls.themeAria" aria-label="Toggle theme">
+            <span class="toggle-icon" aria-hidden="true">◐</span>
+            <span id="themeLabel" data-i18n="controls.themeLight">Light</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="monitor-hero reveal" style="--delay: 0.15s">
+        <div>
+          <h1 data-i18n="monitor.title">Prewarm pulse monitor</h1>
+          <p data-i18n="monitor.subtitle">
+            Track when the cron refreshes hub scans and watch the cache windows.
+          </p>
+        </div>
+        <div class="monitor-actions">
+          <button class="primary" id="refreshButton" data-i18n="monitor.refresh">Refresh now</button>
+          <button class="ghost" id="autoToggle" data-i18n="monitor.autoOn">Auto refresh: On</button>
+        </div>
+      </section>
+
+      <section class="panel monitor-panel reveal" style="--delay: 0.25s">
+        <div class="monitor-meta">
+          <div class="monitor-meta-card">
+            <div class="monitor-meta-label" data-i18n="monitor.meta.lastRun">Last run</div>
+            <div class="monitor-meta-value" id="summaryLastRun">--</div>
+            <div class="monitor-meta-foot" id="summaryLastRunAge">--</div>
+          </div>
+          <div class="monitor-meta-card">
+            <div class="monitor-meta-label" data-i18n="monitor.meta.nextExpiry">Next expiry</div>
+            <div class="monitor-meta-value" id="summaryNextExpiry">--</div>
+            <div class="monitor-meta-foot" id="summaryNextExpiryAge">--</div>
+          </div>
+          <div class="monitor-meta-card">
+            <div class="monitor-meta-label" data-i18n="monitor.meta.fresh">Fresh</div>
+            <div class="monitor-meta-value" id="summaryFresh">--</div>
+            <div class="monitor-meta-foot" data-i18n="monitor.meta.freshFoot">systems</div>
+          </div>
+          <div class="monitor-meta-card">
+            <div class="monitor-meta-label" data-i18n="monitor.meta.stale">Stale</div>
+            <div class="monitor-meta-value" id="summaryStale">--</div>
+            <div class="monitor-meta-foot" data-i18n="monitor.meta.staleFoot">needs refresh</div>
+          </div>
+          <div class="monitor-meta-card">
+            <div class="monitor-meta-label" data-i18n="monitor.meta.missing">Missing</div>
+            <div class="monitor-meta-value" id="summaryMissing">--</div>
+            <div class="monitor-meta-foot" data-i18n="monitor.meta.missingFoot">no cache yet</div>
+          </div>
+        </div>
+        <div class="monitor-grid" id="monitorGrid"></div>
+        <div class="results-empty" id="monitorEmpty" data-i18n="monitor.empty">
+          No systems configured.
+        </div>
+      </section>
+
+      <footer class="footer reveal" style="--delay: 0.35s">
+        <div data-i18n="monitor.footer">Status is read from the latest prewarm payloads.</div>
+      </footer>
+    </div>
+
+    <script defer src="monitor.js"></script>
+  </body>
+</html>

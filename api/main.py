@@ -21,24 +21,12 @@ CACHE_TTL = int(os.getenv("SCAN_CACHE_TTL", "1800"))
 ESI_SLEEP = float(os.getenv("ESI_SLEEP", "0.05"))
 ESI_RETRIES = int(os.getenv("ESI_RETRIES", "2"))
 ESI_TIMEOUT = int(os.getenv("ESI_TIMEOUT", "30"))
-PREWARM_ENABLED = os.getenv("PREWARM_ENABLED", "0").lower() in ("1", "true", "yes")
-PREWARM_INTERVAL_SEC = int(os.getenv("PREWARM_INTERVAL_SEC", "1800"))
-PREWARM_START_SYSTEMS = [
+PREWARM_OUTPUT_DIR = os.getenv("PREWARM_OUTPUT_DIR", "/data/prewarm")
+PREWARM_STATUS_SYSTEMS = [
     name.strip()
-    for name in os.getenv("PREWARM_START_SYSTEMS", "Jita,Amarr,Dodixie,Rens,Hek").split(",")
+    for name in os.getenv("PREWARM_STATUS_SYSTEMS", "Jita,Amarr,Dodixie,Rens,Hek").split(",")
     if name.strip()
 ]
-PREWARM_MAX_JUMPS = int(os.getenv("PREWARM_MAX_JUMPS", "5"))
-PREWARM_SAMPLE_SIZE = int(os.getenv("PREWARM_SAMPLE_SIZE", "40"))
-PREWARM_TYPES_PAGES = int(os.getenv("PREWARM_TYPES_PAGES", "1"))
-PREWARM_ORDER_PAGES = int(os.getenv("PREWARM_ORDER_PAGES", "1"))
-PREWARM_LIMIT = int(os.getenv("PREWARM_LIMIT", "10"))
-PREWARM_MIN_SECURITY = float(os.getenv("PREWARM_MIN_SECURITY", "0.5"))
-PREWARM_MIN_MARGIN = float(os.getenv("PREWARM_MIN_MARGIN", "8"))
-PREWARM_MAX_RUNTIME = int(os.getenv("PREWARM_MAX_RUNTIME", "12"))
-PREWARM_BUDGET = float(os.getenv("PREWARM_BUDGET", "10000000"))
-PREWARM_MODE = os.getenv("PREWARM_MODE", "both")
-PREWARM_OUTPUT_DIR = os.getenv("PREWARM_OUTPUT_DIR", "/data/prewarm")
 
 app = FastAPI()
 
@@ -53,6 +41,21 @@ def utc_now():
 
 def ts_to_utc(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def parse_system_list(value):
+    if not value:
+        return []
+    return [name.strip() for name in value.split(",") if name.strip()]
+
+
+def parse_iso_ts(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
 
 
 def prune_cache(now):
@@ -70,20 +73,6 @@ def prewarm_key(value):
 
 def prewarm_path(key):
     return os.path.join(PREWARM_OUTPUT_DIR, f"{key}.json")
-
-
-def is_prewarm_fresh(path, now):
-    if not os.path.exists(path):
-        return False
-    return now - os.path.getmtime(path) < CACHE_TTL
-
-
-def write_prewarm_payload(path, payload):
-    os.makedirs(PREWARM_OUTPUT_DIR, exist_ok=True)
-    temp_path = f"{path}.tmp"
-    with open(temp_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, sort_keys=True)
-    os.replace(temp_path, path)
 
 
 def load_prewarm_payload(start_system):
@@ -682,75 +671,6 @@ def scan_market(
     }
 
 
-def normalize_mode(value):
-    value = str(value or "").strip().lower()
-    return value if value in ("instant", "list", "both") else "both"
-
-
-def prewarm_loop():
-    if not PREWARM_START_SYSTEMS:
-        return
-    mode = normalize_mode(PREWARM_MODE)
-    while True:
-        loop_start = time.time()
-        for system in PREWARM_START_SYSTEMS:
-            max_jumps, sample_size, types_pages, order_pages, tuned = tune_scan_params(
-                PREWARM_MAX_JUMPS,
-                PREWARM_SAMPLE_SIZE,
-                PREWARM_TYPES_PAGES,
-                PREWARM_ORDER_PAGES,
-            )
-            name_key = prewarm_key(system)
-            name_path = prewarm_path(name_key)
-            if is_prewarm_fresh(name_path, loop_start):
-                continue
-            try:
-                data = scan_market(
-                    system,
-                    PREWARM_BUDGET,
-                    max_jumps,
-                    PREWARM_MIN_SECURITY,
-                    PREWARM_MIN_MARGIN,
-                    sample_size,
-                    types_pages,
-                    order_pages,
-                    0.0,
-                    mode,
-                    2.0,
-                    3.0,
-                    PREWARM_LIMIT,
-                    False,
-                    False,
-                    False,
-                    PREWARM_MAX_RUNTIME,
-                )
-                data["tuned"] = tuned
-                data["max_jumps_requested"] = PREWARM_MAX_JUMPS
-                now = time.time()
-                data["cached"] = True
-                data["prewarmed"] = True
-                data["cache_expires_at"] = ts_to_utc(now + CACHE_TTL)
-                data["expires_ts"] = now + CACHE_TTL
-                start_system_id = data.get("start_system_id")
-                write_prewarm_payload(name_path, data)
-                if start_system_id:
-                    id_path = prewarm_path(start_system_id)
-                    write_prewarm_payload(id_path, data)
-            except Exception as exc:
-                print(f"Prewarm failed for {system}: {exc}", flush=True)
-        elapsed = time.time() - loop_start
-        sleep_for = max(0, PREWARM_INTERVAL_SEC - elapsed)
-        time.sleep(sleep_for)
-
-
-@app.on_event("startup")
-def start_prewarm():
-    if not PREWARM_ENABLED:
-        return
-    thread = threading.Thread(target=prewarm_loop, name="prewarm-loop", daemon=True)
-    thread.start()
-
-
 @app.get("/api/scan")
 def scan(start_system: str = Query("Jita")):
     payload = load_prewarm_payload(start_system)
@@ -760,3 +680,97 @@ def scan(start_system: str = Query("Jita")):
             detail=f"No prewarmed data for '{start_system}'.",
         )
     return payload
+
+
+@app.get("/api/prewarm/status")
+def prewarm_status(systems: str | None = Query(None)):
+    requested = parse_system_list(systems) if systems else PREWARM_STATUS_SYSTEMS
+    now = time.time()
+    items = []
+    counts = {"fresh": 0, "stale": 0, "missing": 0, "error": 0}
+    latest_generated_ts = None
+    next_expiry_ts = None
+
+    for system in requested:
+        key = str(system)
+        if not key.isdigit():
+            key = prewarm_key(key)
+        path = prewarm_path(key)
+        if not os.path.exists(path):
+            items.append({"system": system, "key": key, "status": "missing"})
+            counts["missing"] += 1
+            continue
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+        except Exception as exc:
+            generated_at = ts_to_utc(os.path.getmtime(path))
+            items.append(
+                {"system": system, "key": key, "status": "error", "generated_at": generated_at, "error": str(exc)}
+            )
+            counts["error"] += 1
+            continue
+
+        expires_ts = payload.get("expires_ts")
+        if expires_ts is None:
+            expires_ts = parse_iso_ts(payload.get("cache_expires_at"))
+
+        stale = expires_ts is not None and now > expires_ts
+        status = "stale" if stale else "fresh"
+        counts[status] += 1
+
+        generated_at = payload.get("generated_at")
+        if not generated_at:
+            generated_at = ts_to_utc(os.path.getmtime(path))
+
+        generated_ts = parse_iso_ts(generated_at)
+        if generated_ts is not None:
+            if latest_generated_ts is None or generated_ts > latest_generated_ts:
+                latest_generated_ts = generated_ts
+
+        if expires_ts is not None:
+            if next_expiry_ts is None or expires_ts < next_expiry_ts:
+                next_expiry_ts = expires_ts
+
+        cache_expires_at = payload.get("cache_expires_at")
+        if cache_expires_at is None and expires_ts is not None:
+            cache_expires_at = ts_to_utc(expires_ts)
+
+        items.append(
+            {
+                "system": system,
+                "key": key,
+                "status": status,
+                "stale": stale,
+                "generated_at": generated_at,
+                "cache_expires_at": cache_expires_at,
+                "expires_ts": expires_ts,
+                "start_system_id": payload.get("start_system_id"),
+                "start_system_name": payload.get("start_system_name"),
+            }
+        )
+
+    status_path = os.getenv(
+        "PREWARM_STATUS_FILE", os.path.join(PREWARM_OUTPUT_DIR, "last_run.json")
+    )
+    last_run = None
+    if os.path.exists(status_path):
+        try:
+            with open(status_path, "r", encoding="utf-8") as f:
+                last_run = json.load(f)
+        except Exception:
+            last_run = None
+
+    summary = {
+        **counts,
+        "latest_generated_at": ts_to_utc(latest_generated_ts) if latest_generated_ts is not None else None,
+        "next_expiry_at": ts_to_utc(next_expiry_ts) if next_expiry_ts is not None else None,
+    }
+
+    return {
+        "generated_at": utc_now(),
+        "summary": summary,
+        "last_run": last_run,
+        "systems": items,
+    }
