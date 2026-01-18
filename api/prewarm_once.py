@@ -106,7 +106,12 @@ def run():
         min_margin = float(os.getenv("PREWARM_MIN_MARGIN", "8"))
         max_runtime = int(os.getenv("PREWARM_MAX_RUNTIME", "12"))
         budget = float(os.getenv("PREWARM_BUDGET", "10000000"))
-        mode = normalize_mode(os.getenv("PREWARM_MODE", "both"))
+        mode = normalize_mode(os.getenv("PREWARM_MODE", "instant"))
+        cargo_m3 = float(os.getenv("PREWARM_CARGO_M3", "12000"))
+        min_profit_per_jump = float(os.getenv("PREWARM_MIN_PROFIT_PER_JUMP", "200000"))
+        min_results = int(os.getenv("PREWARM_MIN_RESULTS", "3"))
+        fallback_max_jumps = int(os.getenv("PREWARM_FALLBACK_MAX_JUMPS", str(max_jumps_default)))
+        fallback_min_security = float(os.getenv("PREWARM_FALLBACK_MIN_SECURITY", str(min_security)))
         sample_seed = os.getenv("PREWARM_SAMPLE_SEED")
         if sample_seed is not None:
             sample_seed = sample_seed.strip()
@@ -181,16 +186,52 @@ def run():
                     max_runtime,
                     sample_seed,
                     home_order_pages,
+                    cargo_m3,
+                    min_profit_per_jump,
+                    min_results,
                 )
+                results = data.get("results", {})
+                opportunity_count = len(results.get("instant", [])) + len(results.get("list", []))
+                fallback_used = False
+                if opportunity_count < min_results and (
+                    fallback_max_jumps > max_jumps or fallback_min_security < min_security
+                ):
+                    data = scan_market(
+                        system,
+                        budget,
+                        fallback_max_jumps,
+                        fallback_min_security,
+                        min_margin,
+                        sample_size,
+                        types_pages,
+                        order_pages,
+                        0.0,
+                        mode,
+                        2.0,
+                        3.0,
+                        limit_default,
+                        False,
+                        False,
+                        False,
+                        max_runtime,
+                        sample_seed,
+                        home_order_pages,
+                        cargo_m3,
+                        min_profit_per_jump,
+                        min_results,
+                    )
+                    results = data.get("results", {})
+                    opportunity_count = len(results.get("instant", [])) + len(results.get("list", []))
+                    fallback_used = True
                 data["tuned"] = tuned
-                data["max_jumps_requested"] = max_jumps_default
+                data["max_jumps_requested"] = fallback_max_jumps if fallback_used else max_jumps
+                data["fallback_used"] = fallback_used
                 stamp = time.time()
                 data["cached"] = True
                 data["prewarmed"] = True
                 data["cache_expires_at"] = ts_to_utc(stamp + CACHE_TTL)
                 data["expires_ts"] = stamp + CACHE_TTL
-                results = data.get("results", {})
-                total_opportunities += len(results.get("instant", [])) + len(results.get("list", []))
+                total_opportunities += opportunity_count
                 write_payload(name_path, data)
                 if data.get("start_system_id"):
                     id_path = prewarm_path(output_dir, data["start_system_id"])

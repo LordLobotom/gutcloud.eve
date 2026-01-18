@@ -59,7 +59,6 @@
           </p>
           <div class="hero-actions">
             <button class="primary" id="quickScan" data-i18n="hero.quickScan">Quick scan</button>
-            <button class="ghost" id="resetFilters" data-i18n="hero.reset">Reset filters</button>
           </div>
         </div>
         <div class="hero-stats reveal" style="--delay: 0.25s">
@@ -98,25 +97,6 @@
             <label class="field">
               <span data-i18n="filters.start">Start location</span>
               <select id="startLocation"></select>
-            </label>
-            <label class="field">
-              <span data-i18n="filters.jumps">Max jumps</span>
-              <div class="range">
-                <input id="maxJumps" type="range" min="1" max="8" value="6" />
-                <output id="maxJumpsValue">6</output>
-              </div>
-            </label>
-            <label class="field">
-              <span data-i18n="filters.earnings">Minimum earnings (ISK)</span>
-              <input id="minProfit" type="text" inputmode="numeric" value="1000000" autocomplete="off" />
-            </label>
-            <label class="field">
-              <span data-i18n="filters.sort">Sort by</span>
-              <select id="sortBy">
-                <option value="score" data-i18n="filters.sortScore">Signal score</option>
-                <option value="profit" data-i18n="filters.sortProfit">Highest earnings</option>
-                <option value="jumps" data-i18n="filters.sortJumps">Fewest jumps</option>
-              </select>
             </label>
             <button class="primary" type="button" id="searchButton" data-i18n="filters.search">Search routes</button>
           </form>

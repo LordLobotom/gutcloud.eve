@@ -27,6 +27,7 @@ PREWARM_STATUS_SYSTEMS = [
     for name in os.getenv("PREWARM_STATUS_SYSTEMS", "Jita,Amarr,Dodixie,Rens,Hek").split(",")
     if name.strip()
 ]
+PREWARM_AGGREGATE_LABEL = os.getenv("PREWARM_AGGREGATE_LABEL", "Any hub")
 
 app = FastAPI()
 
@@ -126,6 +127,7 @@ class EsiClient:
                 "constellations": {},
                 "stargates": {},
                 "names": {},
+                "types": {},
             }
         with open(self.cache_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -133,6 +135,7 @@ class EsiClient:
         data.setdefault("constellations", {})
         data.setdefault("stargates", {})
         data.setdefault("names", {})
+        data.setdefault("types", {})
         return data
 
     def save_cache(self):
@@ -229,6 +232,14 @@ class EsiClient:
         if systems:
             return systems[0].get("id")
         return None
+
+    def get_type(self, type_id):
+        key = str(type_id)
+        if key in self.cache["types"]:
+            return self.cache["types"][key]
+        data, _ = self.get_json(f"/universe/types/{type_id}/")
+        self.cache["types"][key] = data
+        return data
 
 
 client = EsiClient(
@@ -513,6 +524,9 @@ def scan_market(
     max_runtime,
     sample_seed=None,
     home_order_pages=None,
+    cargo_m3=None,
+    min_profit_per_jump=None,
+    min_results=None,
 ):
     start_ts = time.monotonic()
     deadline = start_ts + max_runtime if max_runtime else None
@@ -586,24 +600,44 @@ def scan_market(
     if not types:
         raise ValueError("No market types found.")
 
+    min_results = int(min_results) if min_results is not None else 0
     if sample_size <= 0 or sample_size >= len(types):
         sample_types = list(types)
+        extra_types = []
     else:
         if sample_seed is not None:
             random.seed(sample_seed)
-        sample_types = random.sample(types, sample_size)
+            sample_types = random.sample(types, sample_size)
+        else:
+            sample_types = list(types[:sample_size])
+        sample_set = set(sample_types)
+        extra_types = [type_id for type_id in types if type_id not in sample_set]
 
     budget = float(budget)
     max_price = max_price or budget
+    cargo_m3 = float(cargo_m3) if cargo_m3 else None
+    min_profit_per_jump = float(min_profit_per_jump) if min_profit_per_jump else None
 
     instant_results = []
     list_results = []
 
     timed_out = nearby_timed_out
-    for type_id in sample_types:
+    def process_type(type_id):
+        nonlocal timed_out
         if deadline and time.monotonic() > deadline:
             timed_out = True
-            break
+            return False
+
+        type_info = client.get_type(type_id) or {}
+        volume_m3 = type_info.get("packaged_volume") or type_info.get("volume")
+        try:
+            volume_m3 = float(volume_m3) if volume_m3 is not None else None
+        except (TypeError, ValueError):
+            volume_m3 = None
+
+        if volume_m3 is None or volume_m3 <= 0:
+            return True
+
         home_pages = home_order_pages if home_order_pages is not None else max(order_pages, 3)
         home_sell, home_sell_vol = find_best_home_sell(
             client,
@@ -613,7 +647,7 @@ def scan_market(
             max_pages=home_pages,
         )
         if home_sell is None or home_sell > max_price:
-            continue
+            return True
 
         if mode in ("instant", "both"):
             best_buy, best_order = find_best_order_in_systems(
@@ -631,27 +665,50 @@ def scan_market(
                     sys_id = best_order.get("system_id")
                     sys_id = int(sys_id) if sys_id is not None else None
                     if sys_id == start_system_id:
-                        continue
+                        return True
                     sys_info = systems.get(sys_id, {})
+                    jumps = sys_info.get("jumps") or 0
+                    if jumps <= 0:
+                        return True
                     max_units_budget = int(budget // home_sell)
-                    max_units = max_units_budget
+                    max_units_trade = max_units_budget
+                    if cargo_m3:
+                        max_units_cargo = int(cargo_m3 // volume_m3)
+                        if max_units_cargo <= 0:
+                            return True
+                        max_units_trade = min(max_units_trade, max_units_cargo)
+                    else:
+                        max_units_cargo = None
                     buy_vol = best_order.get("volume_remain", 0)
                     if buy_vol:
-                        max_units = min(max_units, int(buy_vol))
+                        max_units_trade = min(max_units_trade, int(buy_vol))
+                    if max_units_trade <= 0:
+                        return True
+                    profit_total = net_profit * max_units_trade
+                    profit_per_jump = profit_total / jumps if jumps else 0.0
+                    if min_profit_per_jump and profit_per_jump < min_profit_per_jump:
+                        return True
                     instant_results.append({
                         "mode": "instant",
                         "type_id": type_id,
+                        "origin_system_id": start_system_id,
+                        "origin_system_name": start_system_name,
                         "home_sell": round(home_sell, 2),
                         "home_sell_vol": home_sell_vol,
                         "best_buy": round(best_buy, 2),
                         "best_buy_system": sys_info.get("name"),
-                        "jumps": sys_info.get("jumps"),
+                        "jumps": jumps,
                         "security": round(sys_info.get("security", 0.0), 2),
                         "profit_per_unit": round(net_profit, 2),
                         "margin_pct": round(pct, 2),
+                        "volume_m3": round(volume_m3, 4),
+                        "cargo_m3": cargo_m3,
                         "max_units_budget": max_units_budget,
-                        "max_units_trade": max_units,
-                        "est_profit_budget": round(net_profit * max_units, 2),
+                        "max_units_cargo": max_units_cargo,
+                        "max_units_trade": max_units_trade,
+                        "est_profit_budget": round(profit_total, 2),
+                        "est_profit_per_jump": round(profit_per_jump, 2),
+                        "cargo_m3_used": round(max_units_trade * volume_m3, 2),
                     })
 
         if mode in ("list", "both"):
@@ -668,23 +725,62 @@ def scan_market(
                     sys_id = best_order.get("system_id")
                     sys_id = int(sys_id) if sys_id is not None else None
                     if sys_id == start_system_id:
-                        continue
+                        return True
                     sys_info = systems.get(sys_id, {})
+                    jumps = sys_info.get("jumps") or 0
+                    if jumps <= 0:
+                        return True
                     max_units_budget = int(budget // home_sell)
+                    max_units_trade = max_units_budget
+                    if cargo_m3:
+                        max_units_cargo = int(cargo_m3 // volume_m3)
+                        if max_units_cargo <= 0:
+                            return True
+                        max_units_trade = min(max_units_trade, max_units_cargo)
+                    else:
+                        max_units_cargo = None
+                    if max_units_trade <= 0:
+                        return True
+                    profit_total = net_profit * max_units_trade
+                    profit_per_jump = profit_total / jumps if jumps else 0.0
+                    if min_profit_per_jump and profit_per_jump < min_profit_per_jump:
+                        return True
                     list_results.append({
                         "mode": "list",
                         "type_id": type_id,
+                        "origin_system_id": start_system_id,
+                        "origin_system_name": start_system_name,
                         "home_sell": round(home_sell, 2),
                         "home_sell_vol": home_sell_vol,
                         "best_sell": round(best_sell, 2),
                         "best_sell_system": sys_info.get("name"),
-                        "jumps": sys_info.get("jumps"),
+                        "jumps": jumps,
                         "security": round(sys_info.get("security", 0.0), 2),
                         "profit_per_unit": round(net_profit, 2),
                         "margin_pct": round(pct, 2),
+                        "volume_m3": round(volume_m3, 4),
+                        "cargo_m3": cargo_m3,
                         "max_units_budget": max_units_budget,
-                        "est_profit_budget": round(net_profit * max_units_budget, 2),
+                        "max_units_cargo": max_units_cargo,
+                        "max_units_trade": max_units_trade,
+                        "est_profit_budget": round(profit_total, 2),
+                        "est_profit_per_jump": round(profit_per_jump, 2),
+                        "cargo_m3_used": round(max_units_trade * volume_m3, 2),
                     })
+        return True
+
+    for type_id in sample_types:
+        if not process_type(type_id):
+            break
+
+    total_found = len(instant_results) + len(list_results)
+    if min_results and total_found < min_results and extra_types:
+        for type_id in extra_types:
+            if not process_type(type_id):
+                break
+            total_found = len(instant_results) + len(list_results)
+            if total_found >= min_results:
+                break
 
     all_type_ids = {row["type_id"] for row in instant_results + list_results}
     name_map = client.resolve_names(sorted(all_type_ids)) if all_type_ids else {}
@@ -709,6 +805,9 @@ def scan_market(
         "min_security": min_security,
         "min_margin_pct": min_margin_pct,
         "sample_size": len(sample_types),
+        "cargo_m3": cargo_m3,
+        "min_profit_per_jump": min_profit_per_jump,
+        "min_results": min_results,
         "partial": timed_out,
         "runtime_ms": int((time.monotonic() - start_ts) * 1000),
         "results": {
@@ -720,6 +819,36 @@ def scan_market(
 
 @app.get("/api/scan")
 def scan(start_system: str = Query("Jita")):
+    start_key = (start_system or "").strip().lower()
+    if start_key in ("any", "all", "*"):
+        combined = []
+        for system in PREWARM_STATUS_SYSTEMS:
+            payload = load_prewarm_payload(system)
+            if payload is None:
+                continue
+            for mode_key in ("instant", "list"):
+                for row in payload.get("results", {}).get(mode_key, []):
+                    combined.append({
+                        **row,
+                        "origin_system_id": row.get("origin_system_id") or payload.get("start_system_id"),
+                        "origin_system_name": row.get("origin_system_name") or payload.get("start_system_name"),
+                    })
+        if not combined:
+            raise HTTPException(
+                status_code=404,
+                detail="No prewarmed data for any hub.",
+            )
+        return {
+            "generated_at": utc_now(),
+            "start_system_name": PREWARM_AGGREGATE_LABEL,
+            "cached": True,
+            "prewarmed": True,
+            "results": {
+                "instant": [row for row in combined if row.get("mode") == "instant"],
+                "list": [row for row in combined if row.get("mode") == "list"],
+            },
+        }
+
     payload = load_prewarm_payload(start_system)
     if payload is None:
         raise HTTPException(

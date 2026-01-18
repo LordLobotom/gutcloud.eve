@@ -199,7 +199,7 @@ const translations = {
     },
     panel: {
       title: "Route search",
-      subtitle: "Choose a hub, set your max jumps, and filter by profit floor.",
+      subtitle: "Choose a hub to scan live hauling spreads.",
       updated: "Updated"
     },
     filters: {
@@ -216,7 +216,7 @@ const translations = {
     },
     results: {
       title: "Trade options",
-      empty: "No routes match your filters.",
+      empty: "No hauling routes available.",
       count: (count) => `${count} routes match your scan`,
       loading: "Scanning live markets...",
       sourceLive: "Live ESI feed",
@@ -295,7 +295,7 @@ const translations = {
     },
     panel: {
       title: "Hledání tras",
-      subtitle: "Vyber hub, nastav max. skoky a minimální zisk.",
+      subtitle: "Vyber hub pro scan hauling spreadů.",
       updated: "Aktualizováno"
     },
     filters: {
@@ -312,7 +312,7 @@ const translations = {
     },
     results: {
       title: "Možnosti obchodu",
-      empty: "Žádné trasy neodpovídají filtrům.",
+      empty: "Žádné hauling trasy nejsou dostupné.",
       count: (count) => `${count} tras odpovídá filtru`,
       loading: "Skenuji live trhy...",
       sourceLive: "Live ESI feed",
@@ -379,10 +379,6 @@ const localeMap = {
 
 const elements = {
   startLocation: document.getElementById("startLocation"),
-  maxJumps: document.getElementById("maxJumps"),
-  maxJumpsValue: document.getElementById("maxJumpsValue"),
-  minProfit: document.getElementById("minProfit"),
-  sortBy: document.getElementById("sortBy"),
   resultsList: document.getElementById("resultsList"),
   resultsEmpty: document.getElementById("resultsEmpty"),
   resultsCount: document.getElementById("resultsCount"),
@@ -398,13 +394,10 @@ const elements = {
   themeLabel: document.getElementById("themeLabel"),
   langToggle: document.getElementById("langToggle"),
   quickScan: document.getElementById("quickScan"),
-  resetFilters: document.getElementById("resetFilters"),
   searchButton: document.getElementById("searchButton")
 };
 
 const START_LOCATIONS = ["Jita", "Perimeter", "Amarr", "Dodixie", "Rens", "Hek"];
-const DEFAULT_MIN_PROFIT = 1000000;
-const MAX_JUMPS = 8;
 const LIVE_DEFAULTS = {
   maxRuntime: 12
 };
@@ -424,7 +417,7 @@ const formatters = {
 };
 
 const calc = {
-  profitPerJump: (route) => route.profit / route.jumps,
+  profitPerJump: (route) => (route.jumps ? route.profit / route.jumps : 0),
   score: (route) => {
     const efficiency = calc.profitPerJump(route);
     return efficiency * (1 - route.risk) * (1 + route.demand / 200);
@@ -444,17 +437,6 @@ const getTranslation = (key) => {
   return current;
 };
 
-const parseNumberInput = (value) => {
-  const digits = String(value || "").replace(/[^\d]/g, "");
-  return digits ? parseInt(digits, 10) : 0;
-};
-
-const setMinProfitFormatted = (value) => {
-  elements.minProfit.value = value ? String(value) : "";
-};
-
-const getMinProfitValue = () => parseNumberInput(elements.minProfit.value);
-
 const setLocale = (locale) => {
   activeLocale = locale;
   document.documentElement.lang = locale;
@@ -463,8 +445,6 @@ const setLocale = (locale) => {
   updateLanguageToggle();
   const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
   setTheme(currentTheme);
-  const minProfit = getMinProfitValue() || DEFAULT_MIN_PROFIT;
-  setMinProfitFormatted(minProfit);
   refresh();
 };
 
@@ -596,7 +576,7 @@ const getEmptyMessageKey = () => {
 
 const getStartSystem = () => {
   const selected = elements.startLocation.value;
-  if (selected && selected !== "any") {
+  if (selected) {
     return selected;
   }
   return START_LOCATIONS[0] || "Jita";
@@ -615,7 +595,7 @@ const toSecurityLabel = (security) => {
 const mapLiveResults = (payload) => {
   const instant = (payload.results && payload.results.instant) || [];
   const list = (payload.results && payload.results.list) || [];
-  const startSystem = payload.start_system_name || getStartSystem();
+  const fallbackStart = payload.start_system_name || getStartSystem();
 
   return [...instant, ...list].map((row, index) => {
     const securityValue = typeof row.security === "number" ? row.security : 0;
@@ -623,11 +603,14 @@ const mapLiveResults = (payload) => {
     const demand = clamp(Math.round((row.margin_pct || 0) + 45), 35, 95);
     const toSystem = row.best_buy_system || row.best_sell_system || "Unknown";
     const typeName = row.type_name || "Unknown";
-    const volume = row.max_units_trade || row.max_units_budget || 0;
+    const origin = row.origin_system_name || fallbackStart;
+    const volumeUsed = row.cargo_m3_used || 0;
+    const units = row.max_units_trade || row.max_units_budget || 0;
+    const volume = volumeUsed || (row.volume_m3 ? row.volume_m3 * units : 0);
 
     return {
       id: `${row.mode || "scan"}-${row.type_id}-${index}`,
-      from: startSystem,
+      from: origin,
       to: toSystem,
       jumps: row.jumps || 0,
       profit: row.est_profit_budget || 0,
@@ -705,22 +688,11 @@ const updateTimestamp = () => {
 
 const filterRoutes = () => {
   const start = elements.startLocation.value;
-  const maxJumps = parseInt(elements.maxJumps.value, 10);
-  const minProfit = getMinProfitValue();
-
   let filtered = activeRoutes.filter((route) => {
     const matchesStart = start === "any" || route.from === start;
-    return matchesStart && route.jumps <= maxJumps && route.profit >= minProfit;
+    return matchesStart;
   });
-
-  const sortBy = elements.sortBy.value;
-  if (sortBy === "profit") {
-    filtered = filtered.sort((a, b) => b.profit - a.profit);
-  } else if (sortBy === "jumps") {
-    filtered = filtered.sort((a, b) => a.jumps - b.jumps);
-  } else {
-    filtered = filtered.sort((a, b) => calc.score(b) - calc.score(a));
-  }
+  filtered = filtered.sort((a, b) => b.profit - a.profit);
 
   renderResults(filtered);
   updateTimestamp();
@@ -844,9 +816,6 @@ const refresh = () => {
 };
 
 const init = () => {
-  if (!elements.minProfit.value) {
-    elements.minProfit.value = String(DEFAULT_MIN_PROFIT);
-  }
   const storedLocale = localStorage.getItem("locale");
   const browserLocale = navigator.language.startsWith("cs") ? "cs" : "en";
   setLocale(storedLocale || browserLocale);
@@ -855,33 +824,11 @@ const init = () => {
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   setTheme(storedTheme || (prefersDark ? "dark" : "light"));
 
-  elements.maxJumpsValue.textContent = elements.maxJumps.value;
-
-  elements.maxJumps.addEventListener("input", () => {
-    let value = parseInt(elements.maxJumps.value, 10) || 1;
-    if (value > MAX_JUMPS) {
-      value = MAX_JUMPS;
-      elements.maxJumps.value = String(value);
-    }
-    elements.maxJumpsValue.textContent = String(value);
-  });
-
   elements.searchButton.addEventListener("click", runLiveScan);
 
   elements.quickScan.addEventListener("click", () => {
     elements.startLocation.value = "any";
-    elements.maxJumps.value = "4";
-    elements.maxJumpsValue.textContent = "4";
-    setMinProfitFormatted(50000000);
-    elements.sortBy.value = "score";
-  });
-
-  elements.resetFilters.addEventListener("click", () => {
-    elements.startLocation.value = "any";
-    elements.maxJumps.value = "6";
-    elements.maxJumpsValue.textContent = "6";
-    setMinProfitFormatted(DEFAULT_MIN_PROFIT);
-    elements.sortBy.value = "score";
+    runLiveScan();
   });
 
   elements.themeToggle.addEventListener("click", () => {
