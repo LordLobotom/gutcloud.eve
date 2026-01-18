@@ -25,17 +25,29 @@ const translations = {
       meta: {
         lastRun: "Last run",
         nextExpiry: "Next expiry",
+        opportunities: "Opportunities",
         fresh: "Fresh",
         stale: "Stale",
         missing: "Missing",
         freshFoot: "systems",
         staleFoot: "needs refresh",
-        missingFoot: "no cache yet"
+        missingFoot: "no cache yet",
+        opportunitiesFoot: "total in cache"
       },
       labels: {
         updated: "Updated at",
         age: "Age",
-        expires: "Expires at"
+        expires: "Expires at",
+        runtime: "Runtime",
+        opportunities: "Opportunities"
+      },
+      history: {
+        title: "Run history",
+        subtitle: "Last 10 cron runs",
+        empty: "No runs logged yet.",
+        duration: "Duration",
+        status: "Status",
+        opportunities: "Opportunities"
       },
       status: {
         fresh: "Fresh",
@@ -72,17 +84,29 @@ const translations = {
       meta: {
         lastRun: "Poslední běh",
         nextExpiry: "Další expirace",
+        opportunities: "Příležitosti",
         fresh: "Aktuální",
         stale: "Zastaralé",
         missing: "Chybí",
         freshFoot: "systémy",
         staleFoot: "čekají na refresh",
-        missingFoot: "zatím bez cache"
+        missingFoot: "zatím bez cache",
+        opportunitiesFoot: "celkem v cache"
       },
       labels: {
         updated: "Aktualizováno",
         age: "Stáří",
-        expires: "Vyprší"
+        expires: "Vyprší",
+        runtime: "Doba běhu",
+        opportunities: "Příležitosti"
+      },
+      history: {
+        title: "Historie běhů",
+        subtitle: "Posledních 10 běhů cron",
+        empty: "Zatím žádné běhy.",
+        duration: "Doba",
+        status: "Stav",
+        opportunities: "Příležitosti"
       },
       status: {
         fresh: "Aktuální",
@@ -112,9 +136,12 @@ const elements = {
   summaryLastRunAge: document.getElementById("summaryLastRunAge"),
   summaryNextExpiry: document.getElementById("summaryNextExpiry"),
   summaryNextExpiryAge: document.getElementById("summaryNextExpiryAge"),
+  summaryOpportunities: document.getElementById("summaryOpportunities"),
   summaryFresh: document.getElementById("summaryFresh"),
   summaryStale: document.getElementById("summaryStale"),
-  summaryMissing: document.getElementById("summaryMissing")
+  summaryMissing: document.getElementById("summaryMissing"),
+  historyList: document.getElementById("historyList"),
+  historyEmpty: document.getElementById("historyEmpty")
 };
 
 const DEFAULT_SYSTEMS = ["Jita", "Amarr", "Dodixie", "Rens", "Hek"];
@@ -219,6 +246,31 @@ const formatRelative = (value) => {
   return rtf.format(Math.round(diffSeconds / 86400), "day");
 };
 
+const formatDuration = (seconds) => {
+  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) {
+    return "--";
+  }
+  const total = Math.max(0, Math.round(seconds));
+  if (total < 60) {
+    return `${total}s`;
+  }
+  const minutes = Math.floor(total / 60);
+  const remainingSeconds = total % 60;
+  if (minutes < 60) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+};
+
+const formatDurationMs = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "--";
+  }
+  return formatDuration(value / 1000);
+};
+
 const getSystemsParam = () => {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get("systems");
@@ -243,6 +295,29 @@ const statusMeta = {
     labelKey: "monitor.status.error"
   },
   loading: {
+    className: "status-loading",
+    labelKey: "monitor.status.loading"
+  }
+};
+
+const runStatusMeta = {
+  ok: {
+    className: "status-ok",
+    labelKey: "monitor.status.fresh"
+  },
+  partial: {
+    className: "status-stale",
+    labelKey: "monitor.status.stale"
+  },
+  failed: {
+    className: "status-error",
+    labelKey: "monitor.status.error"
+  },
+  skipped: {
+    className: "status-missing",
+    labelKey: "monitor.status.missing"
+  },
+  locked: {
     className: "status-loading",
     labelKey: "monitor.status.loading"
   }
@@ -280,6 +355,11 @@ const renderCards = (items) => {
     const systemSub = item.start_system_id ? `${item.system} · ${item.start_system_id}` : item.system;
     const updatedAt = item.generated_at || null;
     const expiresAt = item.cache_expires_at || null;
+    const runtime = formatDurationMs(item.runtime_ms);
+    const opportunityCount =
+      item.opportunity_count === 0 || item.opportunity_count
+        ? item.opportunity_count
+        : "--";
 
     card.innerHTML = `
       <div class="monitor-card-head">
@@ -302,6 +382,14 @@ const renderCards = (items) => {
           <span class="monitor-label">${getTranslation("monitor.labels.expires") || "Expires at"}</span>
           <span class="monitor-value">${formatTime(expiresAt)}</span>
         </div>
+        <div class="monitor-item">
+          <span class="monitor-label">${getTranslation("monitor.labels.runtime") || "Runtime"}</span>
+          <span class="monitor-value">${runtime}</span>
+        </div>
+        <div class="monitor-item">
+          <span class="monitor-label">${getTranslation("monitor.labels.opportunities") || "Opportunities"}</span>
+          <span class="monitor-value">${opportunityCount}</span>
+        </div>
       </div>
     `;
 
@@ -309,17 +397,55 @@ const renderCards = (items) => {
   });
 };
 
+const renderHistory = (history) => {
+  elements.historyList.innerHTML = "";
+  if (!history || history.length === 0) {
+    elements.historyEmpty.style.display = "block";
+    return;
+  }
+  elements.historyEmpty.style.display = "none";
+
+  history.forEach((entry) => {
+    const statusKey = entry.status || "failed";
+    const meta = runStatusMeta[statusKey] || runStatusMeta.failed;
+    const statusLabel = getTranslation(meta.labelKey) || statusKey;
+    const row = document.createElement("div");
+    row.className = "history-row";
+    const startTime = formatTime(entry.started_at);
+    const duration = formatDuration(entry.duration_sec);
+    const opportunities = entry.total_opportunities ?? "--";
+
+    row.innerHTML = `
+      <div class="history-main">
+        <div class="history-time">${startTime}</div>
+        <div class="history-meta">
+          <span>${getTranslation("monitor.history.duration") || "Duration"}: <strong>${duration}</strong></span>
+          <span>${getTranslation("monitor.history.opportunities") || "Opportunities"}: <strong>${opportunities}</strong></span>
+          <span>${getTranslation("monitor.history.status") || "Status"}: <strong>${statusKey}</strong></span>
+        </div>
+      </div>
+      <span class="status-pill ${meta.className}">${statusLabel}</span>
+    `;
+
+    elements.historyList.appendChild(row);
+  });
+};
+
 const updateSummary = (status) => {
   const summary = status?.summary || {};
   const lastRun = status?.last_run || null;
-  const lastRunTime = lastRun?.finished_at || lastRun?.started_at || summary.latest_generated_at;
+  const lastRunStart = lastRun?.started_at || summary.latest_generated_at;
+  const lastRunDuration = lastRun?.duration_sec ?? null;
   const nextExpiry = summary.next_expiry_at || null;
 
   elements.summaryFresh.textContent = summary.fresh ?? "--";
   elements.summaryStale.textContent = summary.stale ?? "--";
   elements.summaryMissing.textContent = summary.missing ?? "--";
-  elements.summaryLastRun.textContent = lastRunTime ? formatTime(lastRunTime) : "--";
-  elements.summaryLastRunAge.textContent = lastRunTime ? formatRelative(lastRunTime) : "--";
+  elements.summaryOpportunities.textContent = summary.total_opportunities ?? "--";
+  elements.summaryLastRun.textContent = lastRunStart ? formatTime(lastRunStart) : "--";
+  elements.summaryLastRunAge.textContent = lastRunDuration !== null
+    ? `${getTranslation("monitor.labels.runtime") || "Runtime"} ${formatDuration(lastRunDuration)}`
+    : "--";
   elements.summaryNextExpiry.textContent = nextExpiry ? formatTime(nextExpiry) : "--";
   elements.summaryNextExpiryAge.textContent = nextExpiry ? formatRelative(nextExpiry) : "--";
 };
@@ -343,6 +469,10 @@ const refresh = async () => {
     elements.monitorEmpty.textContent =
       getTranslation("monitor.error") || "Monitor unavailable.";
     elements.monitorEmpty.style.display = "block";
+    elements.historyList.innerHTML = "";
+    elements.historyEmpty.textContent =
+      getTranslation("monitor.error") || "Monitor unavailable.";
+    elements.historyEmpty.style.display = "block";
     updateSummary(null);
     return;
   }
@@ -350,6 +480,7 @@ const refresh = async () => {
     getTranslation("monitor.empty") || "No systems configured.";
   renderCards(status.systems || []);
   updateSummary(status);
+  renderHistory(status.history || []);
 };
 
 const updateAutoToggle = () => {
@@ -376,6 +507,7 @@ const bootstrap = () => {
   applyTranslations();
   updateLanguageToggle();
   setAutoRefresh(true);
+  renderHistory([]);
 
   elements.themeToggle.addEventListener("click", () => {
     const current = document.documentElement.getAttribute("data-theme") || "light";

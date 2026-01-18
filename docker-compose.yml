@@ -23,6 +23,8 @@ services:
       SCAN_CACHE_TTL: 1800
       ESI_SLEEP: 0.08
       PREWARM_STATUS_SYSTEMS: "Jita,Amarr,Dodixie,Rens,Hek"
+      PREWARM_STATUS_FILE: /data/prewarm/last_run.json
+      PREWARM_HISTORY_FILE: /data/prewarm/history.jsonl
     volumes:
       - ./api/data:/data
     labels:
@@ -49,13 +51,18 @@ services:
       PREWARM_RUN_ON_START: "1"
       PREWARM_OUTPUT_DIR: /data/prewarm
       PREWARM_STATUS_FILE: /data/prewarm/last_run.json
+      PREWARM_HISTORY_FILE: /data/prewarm/history.jsonl
       PREWARM_START_SYSTEMS: "Jita,Amarr,Dodixie,Rens,Hek"
       PREWARM_MAX_JUMPS: 5
-      PREWARM_SAMPLE_SIZE: 40
-      PREWARM_TYPES_PAGES: 1
-      PREWARM_ORDER_PAGES: 1
+      PREWARM_SAMPLE_SIZE: 80
+      PREWARM_TYPES_PAGES: 2
+      PREWARM_ORDER_PAGES: 3
+      PREWARM_HOME_ORDER_PAGES: 5
       PREWARM_LIMIT: 10
-      PREWARM_MAX_RUNTIME: 12
+      PREWARM_MIN_MARGIN: 5
+      PREWARM_MAX_RUNTIME: 45
+      PREWARM_BUDGET: 50000000
+      PREWARM_RETRY_EMPTY: "1"
     volumes:
       - ./api/data:/data
     networks:

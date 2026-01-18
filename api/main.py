@@ -58,6 +58,22 @@ def parse_iso_ts(value):
         return None
 
 
+def load_history(path, limit=10):
+    if not os.path.exists(path):
+        return []
+    entries = deque(maxlen=limit)
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return list(reversed(entries))
+
+
 def prune_cache(now):
     with scan_cache_lock:
         expired = [key for key, entry in scan_cache.items() if now - entry["ts"] > CACHE_TTL]
@@ -472,6 +488,8 @@ def scan_market(
     refresh_nearby,
     refresh_types,
     max_runtime,
+    sample_seed=None,
+    home_order_pages=None,
 ):
     start_ts = time.monotonic()
     deadline = start_ts + max_runtime if max_runtime else None
@@ -548,7 +566,8 @@ def scan_market(
     if sample_size <= 0 or sample_size >= len(types):
         sample_types = list(types)
     else:
-        random.seed(23)
+        if sample_seed is not None:
+            random.seed(sample_seed)
         sample_types = random.sample(types, sample_size)
 
     budget = float(budget)
@@ -562,12 +581,13 @@ def scan_market(
         if deadline and time.monotonic() > deadline:
             timed_out = True
             break
+        home_pages = home_order_pages if home_order_pages is not None else max(order_pages, 3)
         home_sell, home_sell_vol = find_best_home_sell(
             client,
             start_region_id,
             start_system_id,
             type_id,
-            max_pages=order_pages,
+            max_pages=home_pages,
         )
         if home_sell is None or home_sell > max_price:
             continue
@@ -690,6 +710,9 @@ def prewarm_status(systems: str | None = Query(None)):
     counts = {"fresh": 0, "stale": 0, "missing": 0, "error": 0}
     latest_generated_ts = None
     next_expiry_ts = None
+    total_opportunities = 0
+    runtime_total = 0
+    runtime_count = 0
 
     for system in requested:
         key = str(system)
@@ -737,6 +760,21 @@ def prewarm_status(systems: str | None = Query(None)):
         if cache_expires_at is None and expires_ts is not None:
             cache_expires_at = ts_to_utc(expires_ts)
 
+        results = payload.get("results", {})
+        instant = results.get("instant")
+        listed = results.get("list")
+        instant_count = len(instant) if isinstance(instant, list) else 0
+        list_count = len(listed) if isinstance(listed, list) else 0
+        opportunity_count = instant_count + list_count
+        total_opportunities += opportunity_count
+
+        runtime_ms = payload.get("runtime_ms")
+        if isinstance(runtime_ms, (int, float)):
+            runtime_total += runtime_ms
+            runtime_count += 1
+        else:
+            runtime_ms = None
+
         items.append(
             {
                 "system": system,
@@ -748,11 +786,18 @@ def prewarm_status(systems: str | None = Query(None)):
                 "expires_ts": expires_ts,
                 "start_system_id": payload.get("start_system_id"),
                 "start_system_name": payload.get("start_system_name"),
+                "runtime_ms": runtime_ms,
+                "instant_count": instant_count,
+                "list_count": list_count,
+                "opportunity_count": opportunity_count,
             }
         )
 
     status_path = os.getenv(
         "PREWARM_STATUS_FILE", os.path.join(PREWARM_OUTPUT_DIR, "last_run.json")
+    )
+    history_path = os.getenv(
+        "PREWARM_HISTORY_FILE", os.path.join(PREWARM_OUTPUT_DIR, "history.jsonl")
     )
     last_run = None
     if os.path.exists(status_path):
@@ -761,16 +806,20 @@ def prewarm_status(systems: str | None = Query(None)):
                 last_run = json.load(f)
         except Exception:
             last_run = None
+    history = load_history(history_path, limit=10)
 
     summary = {
         **counts,
         "latest_generated_at": ts_to_utc(latest_generated_ts) if latest_generated_ts is not None else None,
         "next_expiry_at": ts_to_utc(next_expiry_ts) if next_expiry_ts is not None else None,
+        "total_opportunities": total_opportunities,
+        "avg_runtime_ms": round(runtime_total / runtime_count, 2) if runtime_count else None,
     }
 
     return {
         "generated_at": utc_now(),
         "summary": summary,
         "last_run": last_run,
+        "history": history,
         "systems": items,
     }

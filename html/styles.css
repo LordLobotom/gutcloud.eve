@@ -620,6 +620,59 @@ h3,
   gap: 16px;
 }
 
+.monitor-history {
+  margin-top: 28px;
+  display: grid;
+  gap: 16px;
+}
+
+.monitor-history-head h2 {
+  margin: 0 0 6px 0;
+}
+
+.monitor-history-head p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.monitor-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+}
+
+.history-main {
+  display: grid;
+  gap: 6px;
+}
+
+.history-time {
+  font-weight: 700;
+}
+
+.history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.history-meta span strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .monitor-card {
   padding: 16px;
   border-radius: 18px;

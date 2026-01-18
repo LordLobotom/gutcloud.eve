@@ -107,19 +107,43 @@ def run():
         max_runtime = int(os.getenv("PREWARM_MAX_RUNTIME", "12"))
         budget = float(os.getenv("PREWARM_BUDGET", "10000000"))
         mode = normalize_mode(os.getenv("PREWARM_MODE", "both"))
+        sample_seed = os.getenv("PREWARM_SAMPLE_SEED")
+        if sample_seed is not None:
+            sample_seed = sample_seed.strip()
+            if not sample_seed:
+                sample_seed = None
+        home_order_pages_raw = os.getenv("PREWARM_HOME_ORDER_PAGES", "")
+        home_order_pages = int(home_order_pages_raw) if home_order_pages_raw else None
+        force = os.getenv("PREWARM_FORCE", "0").lower() in ("1", "true", "yes")
+        retry_empty = os.getenv("PREWARM_RETRY_EMPTY", "0").lower() in ("1", "true", "yes")
 
         failures = 0
         successes = 0
         skipped = 0
+        total_opportunities = 0
         errors = {}
         now = time.time()
 
         for system in start_systems:
             name_key = prewarm_key(system)
             name_path = prewarm_path(output_dir, name_key)
-            if is_fresh(name_path, now, CACHE_TTL):
-                skipped += 1
-                continue
+            if is_fresh(name_path, now, CACHE_TTL) and not force:
+                if retry_empty:
+                    try:
+                        with open(name_path, "r", encoding="utf-8") as f:
+                            existing = json.load(f)
+                        existing_results = existing.get("results", {})
+                        existing_count = len(existing_results.get("instant", [])) + len(
+                            existing_results.get("list", [])
+                        )
+                        if existing_count > 0:
+                            skipped += 1
+                            continue
+                    except Exception:
+                        pass
+                else:
+                    skipped += 1
+                    continue
 
             try:
                 max_jumps, sample_size, types_pages, order_pages, tuned = tune_scan_params(
@@ -146,6 +170,8 @@ def run():
                     False,
                     False,
                     max_runtime,
+                    sample_seed,
+                    home_order_pages,
                 )
                 data["tuned"] = tuned
                 data["max_jumps_requested"] = max_jumps_default
@@ -154,6 +180,8 @@ def run():
                 data["prewarmed"] = True
                 data["cache_expires_at"] = ts_to_utc(stamp + CACHE_TTL)
                 data["expires_ts"] = stamp + CACHE_TTL
+                results = data.get("results", {})
+                total_opportunities += len(results.get("instant", [])) + len(results.get("list", []))
                 write_payload(name_path, data)
                 if data.get("start_system_id"):
                     id_path = prewarm_path(output_dir, data["start_system_id"])
@@ -184,9 +212,16 @@ def run():
             "failures": failures,
             "skipped_fresh": skipped,
             "cache_ttl_sec": CACHE_TTL,
+            "total_opportunities": total_opportunities,
             "errors": errors,
         }
         write_status(status_path, status_payload)
+        history_path = os.getenv(
+            "PREWARM_HISTORY_FILE", os.path.join(output_dir, "history.jsonl")
+        )
+        with open(history_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(status_payload, sort_keys=True))
+            f.write("\n")
 
         if failures:
             raise SystemExit(1)
@@ -202,9 +237,16 @@ def run():
             "failures": 1,
             "skipped_fresh": 0,
             "cache_ttl_sec": CACHE_TTL,
+            "total_opportunities": total_opportunities,
             "errors": {"__run__": str(exc)},
         }
         write_status(status_path, status_payload)
+        history_path = os.getenv(
+            "PREWARM_HISTORY_FILE", os.path.join(output_dir, "history.jsonl")
+        )
+        with open(history_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(status_payload, sort_keys=True))
+            f.write("\n")
         raise
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)

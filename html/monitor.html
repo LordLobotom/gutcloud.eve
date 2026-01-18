@@ -78,6 +78,11 @@
             <div class="monitor-meta-foot" id="summaryNextExpiryAge">--</div>
           </div>
           <div class="monitor-meta-card">
+            <div class="monitor-meta-label" data-i18n="monitor.meta.opportunities">Opportunities</div>
+            <div class="monitor-meta-value" id="summaryOpportunities">--</div>
+            <div class="monitor-meta-foot" data-i18n="monitor.meta.opportunitiesFoot">total in cache</div>
+          </div>
+          <div class="monitor-meta-card">
             <div class="monitor-meta-label" data-i18n="monitor.meta.fresh">Fresh</div>
             <div class="monitor-meta-value" id="summaryFresh">--</div>
             <div class="monitor-meta-foot" data-i18n="monitor.meta.freshFoot">systems</div>
@@ -96,6 +101,18 @@
         <div class="monitor-grid" id="monitorGrid"></div>
         <div class="results-empty" id="monitorEmpty" data-i18n="monitor.empty">
           No systems configured.
+        </div>
+        <div class="monitor-history">
+          <div class="monitor-history-head">
+            <div>
+              <h2 data-i18n="monitor.history.title">Run history</h2>
+              <p data-i18n="monitor.history.subtitle">Last 10 cron runs</p>
+            </div>
+          </div>
+          <div class="monitor-history-list" id="historyList"></div>
+          <div class="results-empty" id="historyEmpty" data-i18n="monitor.history.empty">
+            No runs logged yet.
+          </div>
         </div>
       </section>
 
