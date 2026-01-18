@@ -484,6 +484,14 @@ h3,
   background: rgba(111, 143, 168, 0.25);
 }
 
+.tag-fresh {
+  background: rgba(68, 180, 118, 0.24);
+}
+
+.tag-stale {
+  background: rgba(214, 107, 74, 0.24);
+}
+
 .route-profit-block {
   text-align: right;
   min-width: 140px;

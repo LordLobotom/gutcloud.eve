@@ -247,7 +247,9 @@ const translations = {
       security: (value) => value,
       jumps: (value) => `${value} ${value === 1 ? "jump" : "jumps"}`,
       instant: "Instant",
-      list: "List"
+      list: "List",
+      fresh: "Fresh",
+      stale: "Stale"
     },
     card: {
       profit: "Profit",
@@ -259,6 +261,7 @@ const translations = {
       buyPrice: "Buy price",
       sellPrice: "Sell price",
       unitVolume: "Unit m3",
+      age: "Age",
       demand: "Demand",
       risk: "Risk",
       perJump: "per jump",
@@ -354,7 +357,9 @@ const translations = {
         return `${value} skoků`;
       },
       instant: "Okamžitě",
-      list: "Nabídka"
+      list: "Nabídka",
+      fresh: "Aktualni",
+      stale: "Stare"
     },
     card: {
       profit: "Zisk",
@@ -366,6 +371,7 @@ const translations = {
       buyPrice: "Nákupní cena",
       sellPrice: "Prodejní cena",
       unitVolume: "Objem kusu",
+      age: "Stari",
       demand: "Poptávka",
       risk: "Riziko",
       perJump: "na skok",
@@ -577,6 +583,39 @@ const formatScore = (value) => {
   return formatters.number(locale).format(Math.round(value));
 };
 
+const parseIsoTimestamp = (value) => {
+  if (!value) {
+    return null;
+  }
+  const ts = Date.parse(value);
+  if (Number.isNaN(ts)) {
+    return null;
+  }
+  return ts;
+};
+
+const formatAge = (timestampMs) => {
+  if (!timestampMs) {
+    return "--";
+  }
+  const diffSec = Math.max(0, Math.round((Date.now() - timestampMs) / 1000));
+  if (diffSec < 60) {
+    return `${diffSec}s`;
+  }
+  const minutes = Math.floor(diffSec / 60);
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  if (hours < 24) {
+    return remMinutes ? `${hours}h ${remMinutes}m` : `${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours ? `${days}d ${remHours}h` : `${days}d`;
+};
+
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const escapeHtml = (value) => {
@@ -678,6 +717,8 @@ const mapLiveResults = (payload) => {
     const buyPrice = row.buy_price ?? row.home_sell ?? null;
     const sellPrice = row.sell_price ?? row.best_buy ?? row.best_sell ?? null;
     const unitVolume = row.unit_volume_m3 ?? row.volume_m3 ?? null;
+    const generatedAt = row.origin_generated_at || payload.generated_at || null;
+    const expiresAt = row.origin_cache_expires_at || payload.cache_expires_at || null;
 
     return {
       id: `${row.mode || "scan"}-${row.type_id}-${index}`,
@@ -689,6 +730,8 @@ const mapLiveResults = (payload) => {
       unitVolume,
       buyPrice,
       sellPrice,
+      generatedAtMs: parseIsoTimestamp(generatedAt),
+      expiresAtMs: parseIsoTimestamp(expiresAt),
       risk,
       demand,
       security: toSecurityLabel(securityValue),
@@ -831,10 +874,18 @@ const renderResults = (filtered) => {
     const riskText = translations[activeLocale].riskLevels[riskLabel];
     const modeKey = route.mode === "list" ? "list" : route.mode === "instant" ? "instant" : null;
     const modeLabel = modeKey ? translations[activeLocale].badges[modeKey] : null;
+    const isStale = route.expiresAtMs ? Date.now() > route.expiresAtMs : false;
+    const freshnessLabel = route.expiresAtMs
+      ? translations[activeLocale].badges[isStale ? "stale" : "fresh"]
+      : null;
+    const freshnessClass = isStale ? "tag-stale" : "tag-fresh";
     const securityTag = route.security
       ? `<span class="tag">${escapeHtml(route.security)}</span>`
       : "";
     const modeTag = modeLabel ? `<span class="tag tag-mode">${escapeHtml(modeLabel)}</span>` : "";
+    const freshnessTag = freshnessLabel
+      ? `<span class="tag ${freshnessClass}">${escapeHtml(freshnessLabel)}</span>`
+      : "";
     const cargoLine = primaryCommodity
       ? `<div class="route-cargo"><span>${translations[activeLocale].card.carry}</span><strong class="cargo-name" title="${cargoName}">${cargoName}</strong></div>`
       : "";
@@ -845,6 +896,7 @@ const renderResults = (filtered) => {
     const sellPriceText = formatISKFull(route.sellPrice);
     const unitVolumeText = formatVolume(route.unitVolume);
     const cargoVolumeText = formatVolume(route.volume);
+    const ageText = formatAge(route.generatedAtMs);
 
     card.innerHTML = `
       <div class="route-top">
@@ -854,6 +906,7 @@ const renderResults = (filtered) => {
           <div class="route-tags">
             ${securityTag}
             ${modeTag}
+            ${freshnessTag}
           </div>
         </div>
         <div class="route-profit-block">
@@ -869,6 +922,10 @@ const renderResults = (filtered) => {
         <div class="metric">
           <div class="metric-label">${translations[activeLocale].card.profitPerJump}</div>
           <div class="metric-value">${profitPerJump}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">${translations[activeLocale].card.age}</div>
+          <div class="metric-value">${ageText}</div>
         </div>
         <div class="metric">
           <div class="metric-label">${translations[activeLocale].card.buyPrice}</div>

@@ -846,6 +846,8 @@ def scan(start_system: str = Query("Jita")):
                         **row,
                         "origin_system_id": row.get("origin_system_id") or payload.get("start_system_id"),
                         "origin_system_name": row.get("origin_system_name") or payload.get("start_system_name"),
+                        "origin_generated_at": row.get("origin_generated_at") or payload.get("generated_at"),
+                        "origin_cache_expires_at": row.get("origin_cache_expires_at") or payload.get("cache_expires_at"),
                     })
         if not combined:
             raise HTTPException(
