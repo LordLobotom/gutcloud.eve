@@ -256,6 +256,9 @@ const translations = {
       score: "Signal",
       jumps: "Jumps",
       profitPerJump: "Profit/jump",
+      buyPrice: "Buy price",
+      sellPrice: "Sell price",
+      unitVolume: "Unit m3",
       demand: "Demand",
       risk: "Risk",
       perJump: "per jump",
@@ -360,6 +363,9 @@ const translations = {
       score: "Signál",
       jumps: "Skoky",
       profitPerJump: "Zisk/skok",
+      buyPrice: "Nákupní cena",
+      sellPrice: "Prodejní cena",
+      unitVolume: "Objem kusu",
       demand: "Poptávka",
       risk: "Riziko",
       perJump: "na skok",
@@ -396,6 +402,26 @@ const elements = {
   quickScan: document.getElementById("quickScan"),
   searchButton: document.getElementById("searchButton")
 };
+
+const REQUIRED_ELEMENTS = [
+  "startLocation",
+  "resultsList",
+  "resultsEmpty",
+  "resultsCount",
+  "resultsSummary",
+  "resultsSource",
+  "resultsLoading",
+  "analysisText",
+  "statVolume",
+  "statRoutes",
+  "statSignal",
+  "lastUpdated",
+  "themeToggle",
+  "themeLabel",
+  "langToggle",
+  "quickScan",
+  "searchButton"
+];
 
 const START_LOCATIONS = ["Jita", "Perimeter", "Amarr", "Dodixie", "Rens", "Hek"];
 const LIVE_DEFAULTS = {
@@ -477,6 +503,9 @@ const applyTranslations = () => {
 };
 
 const updateLanguageToggle = () => {
+  if (!elements.langToggle) {
+    return;
+  }
   const active = elements.langToggle.querySelector(`[data-lang="${activeLocale}"]`);
   elements.langToggle.querySelectorAll("[data-lang]").forEach((span) => {
     span.classList.toggle("active", span === active);
@@ -484,6 +513,9 @@ const updateLanguageToggle = () => {
 };
 
 const populateLocations = () => {
+  if (!elements.startLocation) {
+    return;
+  }
   const locations = Array.from(
     new Set([...START_LOCATIONS, ...demoRoutes.map((route) => route.from)])
   ).sort();
@@ -511,9 +543,33 @@ const formatISK = (value) => {
   return `${formatters.compact(locale).format(value)} ISK`;
 };
 
+const formatISKFull = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "--";
+  }
+  const locale = localeMap[activeLocale] || "en-US";
+  const formatter = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+  return `${formatter.format(value)} ISK`;
+};
+
 const formatNumber = (value) => {
   const locale = localeMap[activeLocale] || "en-US";
   return formatters.number(locale).format(value);
+};
+
+const formatVolume = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "--";
+  }
+  const locale = localeMap[activeLocale] || "en-US";
+  const formatter = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+  return `${formatter.format(value)} m3`;
 };
 
 const formatScore = (value) => {
@@ -537,6 +593,9 @@ const escapeHtml = (value) => {
 };
 
 const updateSearchButton = () => {
+  if (!elements.searchButton) {
+    return;
+  }
   const key = isLoading ? "filters.searching" : "filters.search";
   const label = getTranslation(key);
   if (label) {
@@ -545,6 +604,9 @@ const updateSearchButton = () => {
 };
 
 const updateResultsSource = () => {
+  if (!elements.resultsSource) {
+    return;
+  }
   const keyMap = {
     live: "results.sourceLive",
     cached: "results.sourceCached",
@@ -559,6 +621,9 @@ const updateResultsSource = () => {
 
 const setLoadingState = (loading) => {
   isLoading = loading;
+  if (!elements.resultsLoading || !elements.searchButton) {
+    return;
+  }
   elements.resultsLoading.style.display = loading ? "block" : "none";
   elements.searchButton.disabled = loading;
   updateSearchButton();
@@ -575,6 +640,9 @@ const getEmptyMessageKey = () => {
 };
 
 const getStartSystem = () => {
+  if (!elements.startLocation) {
+    return "any";
+  }
   const selected = elements.startLocation.value;
   if (selected) {
     return selected;
@@ -607,6 +675,9 @@ const mapLiveResults = (payload) => {
     const volumeUsed = row.cargo_m3_used || 0;
     const units = row.max_units_trade || row.max_units_budget || 0;
     const volume = volumeUsed || (row.volume_m3 ? row.volume_m3 * units : 0);
+    const buyPrice = row.buy_price ?? row.home_sell ?? null;
+    const sellPrice = row.sell_price ?? row.best_buy ?? row.best_sell ?? null;
+    const unitVolume = row.unit_volume_m3 ?? row.volume_m3 ?? null;
 
     return {
       id: `${row.mode || "scan"}-${row.type_id}-${index}`,
@@ -615,6 +686,9 @@ const mapLiveResults = (payload) => {
       jumps: row.jumps || 0,
       profit: row.est_profit_budget || 0,
       volume,
+      unitVolume,
+      buyPrice,
+      sellPrice,
       risk,
       demand,
       security: toSecurityLabel(securityValue),
@@ -665,6 +739,9 @@ const runLiveScan = async () => {
 };
 
 const updateStats = (filtered) => {
+  if (!elements.statVolume || !elements.statRoutes || !elements.statSignal) {
+    return;
+  }
   const count = filtered.length;
   const totalProfit = filtered.reduce((sum, route) => sum + route.profit, 0);
   const avgDemand = count ? filtered.reduce((sum, route) => sum + route.demand, 0) / count : 0;
@@ -679,6 +756,9 @@ const updateStats = (filtered) => {
 };
 
 const updateTimestamp = () => {
+  if (!elements.lastUpdated) {
+    return;
+  }
   const locale = localeMap[activeLocale] || "en-US";
   elements.lastUpdated.textContent = new Date().toLocaleTimeString(locale, {
     hour: "2-digit",
@@ -687,7 +767,7 @@ const updateTimestamp = () => {
 };
 
 const filterRoutes = () => {
-  const start = elements.startLocation.value;
+  const start = elements.startLocation ? elements.startLocation.value : "any";
   let filtered = activeRoutes.filter((route) => {
     const matchesStart = start === "any" || route.from === start;
     return matchesStart;
@@ -699,6 +779,9 @@ const filterRoutes = () => {
 };
 
 const renderResults = (filtered) => {
+  if (!elements.resultsList || !elements.resultsEmpty) {
+    return;
+  }
   elements.resultsList.innerHTML = "";
   elements.resultsEmpty.style.display = filtered.length ? "none" : "block";
   updateStats(filtered);
@@ -714,21 +797,27 @@ const renderResults = (filtered) => {
   }
 
   const countText = translations[activeLocale].results.count(filtered.length);
-  elements.resultsCount.textContent = countText;
+  if (elements.resultsCount) {
+    elements.resultsCount.textContent = countText;
+  }
 
   const avgProfit = filtered.reduce((sum, route) => sum + route.profit, 0) / filtered.length;
   const avgJumps = filtered.reduce((sum, route) => sum + route.jumps, 0) / filtered.length;
   const summaryText = `${translations[activeLocale].summary.avgProfit(formatISK(avgProfit))} | ${translations[activeLocale].summary.avgJumps(formatNumber(avgJumps.toFixed(1)))}`;
-  elements.resultsSummary.textContent = summaryText;
+  if (elements.resultsSummary) {
+    elements.resultsSummary.textContent = summaryText;
+  }
 
   const topRoute = filtered[0];
   const profitPerJump = formatISK(calc.profitPerJump(topRoute));
   const topCargo = topRoute.primary || topRoute.commodities[0] || "";
-  elements.analysisText.textContent = translations[activeLocale].analysis.summary(
-    topRoute,
-    profitPerJump,
-    topCargo
-  );
+  if (elements.analysisText) {
+    elements.analysisText.textContent = translations[activeLocale].analysis.summary(
+      topRoute,
+      profitPerJump,
+      topCargo
+    );
+  }
 
   filtered.forEach((route) => {
     const card = document.createElement("div");
@@ -752,6 +841,10 @@ const renderResults = (filtered) => {
     const profitPerJump = formatISK(calc.profitPerJump(route));
     const demandValue = `${route.demand}%`;
     const spreadValue = `+${Math.round((route.demand / 100) * 12)}%`;
+    const buyPriceText = formatISKFull(route.buyPrice);
+    const sellPriceText = formatISKFull(route.sellPrice);
+    const unitVolumeText = formatVolume(route.unitVolume);
+    const cargoVolumeText = formatVolume(route.volume);
 
     card.innerHTML = `
       <div class="route-top">
@@ -778,8 +871,20 @@ const renderResults = (filtered) => {
           <div class="metric-value">${profitPerJump}</div>
         </div>
         <div class="metric">
+          <div class="metric-label">${translations[activeLocale].card.buyPrice}</div>
+          <div class="metric-value">${buyPriceText}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">${translations[activeLocale].card.sellPrice}</div>
+          <div class="metric-value">${sellPriceText}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">${translations[activeLocale].card.unitVolume}</div>
+          <div class="metric-value">${unitVolumeText}</div>
+        </div>
+        <div class="metric">
           <div class="metric-label">${translations[activeLocale].card.volume}</div>
-          <div class="metric-value">${formatNumber(route.volume)} m3</div>
+          <div class="metric-value">${cargoVolumeText}</div>
         </div>
         <div class="metric">
           <div class="metric-label">${translations[activeLocale].card.eta}</div>
@@ -816,6 +921,11 @@ const refresh = () => {
 };
 
 const init = () => {
+  const missing = REQUIRED_ELEMENTS.filter((key) => !elements[key]);
+  if (missing.length) {
+    console.warn(`AstraRoute UI missing: ${missing.join(", ")}`);
+    return;
+  }
   const storedLocale = localStorage.getItem("locale");
   const browserLocale = navigator.language.startsWith("cs") ? "cs" : "en";
   setLocale(storedLocale || browserLocale);
@@ -839,6 +949,8 @@ const init = () => {
   elements.langToggle.addEventListener("click", () => {
     setLocale(activeLocale === "en" ? "cs" : "en");
   });
+
+  runLiveScan();
 };
 
 init();

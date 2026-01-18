@@ -84,7 +84,7 @@
         <div class="panel-header">
           <div>
             <h2 data-i18n="panel.title">Route search</h2>
-            <p data-i18n="panel.subtitle">Choose a hub, set your max jumps, and filter by profit floor.</p>
+            <p data-i18n="panel.subtitle">Choose a hub to scan live hauling spreads.</p>
           </div>
           <div class="panel-meta">
             <span data-i18n="panel.updated">Updated</span>
@@ -96,7 +96,15 @@
           <form class="filters" id="filtersForm">
             <label class="field">
               <span data-i18n="filters.start">Start location</span>
-              <select id="startLocation"></select>
+              <select id="startLocation">
+                <option value="any">Any hub</option>
+                <option value="Jita">Jita</option>
+                <option value="Perimeter">Perimeter</option>
+                <option value="Amarr">Amarr</option>
+                <option value="Dodixie">Dodixie</option>
+                <option value="Rens">Rens</option>
+                <option value="Hek">Hek</option>
+              </select>
             </label>
             <button class="primary" type="button" id="searchButton" data-i18n="filters.search">Search routes</button>
           </form>

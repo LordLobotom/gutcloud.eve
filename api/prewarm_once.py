@@ -107,6 +107,8 @@ def run():
         max_runtime = int(os.getenv("PREWARM_MAX_RUNTIME", "12"))
         budget = float(os.getenv("PREWARM_BUDGET", "10000000"))
         mode = normalize_mode(os.getenv("PREWARM_MODE", "instant"))
+        tax_pct = float(os.getenv("PREWARM_TAX_PCT", "2.0"))
+        broker_pct = float(os.getenv("PREWARM_BROKER_PCT", "3.0"))
         cargo_m3 = float(os.getenv("PREWARM_CARGO_M3", "12000"))
         min_profit_per_jump = float(os.getenv("PREWARM_MIN_PROFIT_PER_JUMP", "200000"))
         min_results = int(os.getenv("PREWARM_MIN_RESULTS", "3"))
@@ -177,8 +179,8 @@ def run():
                     order_pages,
                     0.0,
                     mode,
-                    2.0,
-                    3.0,
+                    tax_pct,
+                    broker_pct,
                     limit_default,
                     False,
                     False,
@@ -207,8 +209,8 @@ def run():
                         order_pages,
                         0.0,
                         mode,
-                        2.0,
-                        3.0,
+                        tax_pct,
+                        broker_pct,
                         limit_default,
                         False,
                         False,
