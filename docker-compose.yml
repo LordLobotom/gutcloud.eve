@@ -47,7 +47,7 @@ services:
       CACHE_DIR: /data
       SCAN_CACHE_TTL: 1800
       ESI_SLEEP: 0.08
-      PREWARM_CRON: "*/30 * * * *"
+      PREWARM_CRON: "0 * * * *"
       PREWARM_RUN_ON_START: "1"
       PREWARM_OUTPUT_DIR: /data/prewarm
       PREWARM_STATUS_FILE: /data/prewarm/last_run.json
